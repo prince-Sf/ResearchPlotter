@@ -1,0 +1,831 @@
+{
+  "source_document": "Papers\\fninf-20-1748481.pdf",
+  "page_count": 23,
+  "title": {
+    "value": "A Physics Informed Neural Network (PINN) framework for fractional order modeling of Alzheimer’s disease",
+    "status": "PARTIAL",
+    "source_pages": [
+      1
+    ],
+    "notes": []
+  },
+  "authors": {
+    "value": "Adnan Mehmood; Muhammad Farman; Farkhanda Afzal; Kottakkaran Sooppy Nisar; Mohammed Altaf Ahmed; Mohamed Hafez",
+    "status": "PARTIAL",
+    "source_pages": [
+      1
+    ],
+    "notes": []
+  },
+  "sections": [
+    "1 Introduction",
+    "2 Mathematical framework: Physics",
+    "3 Fractional order model",
+    "0 FN(t) = \tN + ρTμ −αFNAβ −φ1FN",
+    "0 IN(t) = αFNAβ −β1INMρ −(γ + φ2) IN",
+    "0 Aβ(t) = γ IN −β2AβMρ −",
+    "0 Tμ(t) = κAβ −β3TμMρ −",
+    "0 Mρ(t) =",
+    "3.1 Positivity and boundedness of solutions",
+    "3.2 Positive solutions with non local",
+    "0.025\nPer day",
+    "0.08\nPer day",
+    "0.06\nPer day",
+    "0.00017\nPer day",
+    "0.00019\nPer day",
+    "0.002\nPer day",
+    "9.51\nPer day",
+    "0.001\nPer day",
+    "0.277\nPer day",
+    "0.015\nPer day",
+    "3.3 Existence and uniqueness analysis",
+    "3.3.1 Existence of a solution",
+    "3.3.2 Uniqueness under a contraction condition",
+    "3.4 Equilibrium point analysis",
+    "3.5 The reproduction number",
+    "3.6 Iterative and stability analysis via",
+    "1\nEσ L",
+    "3.7 Local stability analysis",
+    "3.8 Global stability analysis using Lyapunov",
+    "3.9 Chaos stabilizing system",
+    "3.10 Logarithmic sensitivity analysis",
+    "4 Results interpretation",
+    "4.1 Mapping model states to measurable",
+    "4.2 Simulations",
+    "5 Optimal control: physics informed",
+    "5.1 Modeling framework and neural",
+    "5.2 Neural network architecture and",
+    "6 Simulation results and comparative",
+    "0.24\nFractional PINN",
+    "0.86\nInteger PINN",
+    "0.11\nTABLE 4 Mean squared error (MSE) metrics for baseline, integer-order",
+    "0.00\nFractional",
+    "0.00\nInteger PINN",
+    "6.1 Comparison with a classical fractional",
+    "7 Conclusion",
+    "2025618\nFarea, A., Yli-Harja, O., and Emmert-Streib, F. (2025a). Understanding physics-",
+    "8092\nHao, W., and Friedman, A. (2016). Mathematical model on Alzheimer’s disease."
+  ],
+  "equations": [
+    {
+      "equation_number": "1",
+      "text": "t ∈D,",
+      "status": "PARTIAL",
+      "source_page": 3
+    },
+    {
+      "equation_number": "2",
+      "text": "u(0) = u0 ∈Rn.",
+      "status": "PARTIAL",
+      "source_page": 3
+    },
+    {
+      "equation_number": "3",
+      "text": "L(φ) = Ldata(φ) + λphysLphys(φ),",
+      "status": "PARTIAL",
+      "source_page": 3
+    },
+    {
+      "equation_number": "17",
+      "text": "dv",
+      "status": "PARTIAL",
+      "source_page": 5
+    },
+    {
+      "equation_number": "19",
+      "text": "(t −v)σ−1ℵ(v, \u000f(v))dv",
+      "status": "PARTIAL",
+      "source_page": 5
+    },
+    {
+      "equation_number": "21",
+      "text": "(t −v)σ−1ℵ(v, \u000f(v))dv",
+      "status": "PARTIAL",
+      "source_page": 5
+    },
+    {
+      "equation_number": "27",
+      "text": "B : = {\u000f ∈χ : ∥\u000f∥≤ψ}.",
+      "status": "PARTIAL",
+      "source_page": 6
+    },
+    {
+      "equation_number": "0",
+      "text": "= FNα+1(t) = FNα",
+      "status": "PARTIAL",
+      "source_page": 7
+    },
+    {
+      "equation_number": "0",
+      "text": "= INα+1(t) = INα",
+      "status": "PARTIAL",
+      "source_page": 7
+    },
+    {
+      "equation_number": "0",
+      "text": "= Aβα+1(t) = Aβα",
+      "status": "PARTIAL",
+      "source_page": 7
+    },
+    {
+      "equation_number": "0",
+      "text": "= Tμα+1(t) = Tμα",
+      "status": "PARTIAL",
+      "source_page": 7
+    },
+    {
+      "equation_number": "0",
+      "text": "= Mρα+1(t) = Mρα",
+      "status": "PARTIAL",
+      "source_page": 8
+    },
+    {
+      "equation_number": "42",
+      "text": "= FNβ (t) −FNα(t)",
+      "status": "PARTIAL",
+      "source_page": 8
+    },
+    {
+      "equation_number": "43",
+      "text": "= INβ (t) −INα(t)",
+      "status": "PARTIAL",
+      "source_page": 8
+    },
+    {
+      "equation_number": "44",
+      "text": "= Tμβ (t) −Tμα(t)",
+      "status": "PARTIAL",
+      "source_page": 8
+    },
+    {
+      "equation_number": "45",
+      "text": "= Mρβ (t) −Mρα(t)",
+      "status": "PARTIAL",
+      "source_page": 8
+    },
+    {
+      "equation_number": "61",
+      "text": "π = (0, 0, 0, 0, 0),",
+      "status": "PARTIAL",
+      "source_page": 9
+    },
+    {
+      "equation_number": "64",
+      "text": "λ4 = −11.3265217160782",
+      "status": "PARTIAL",
+      "source_page": 11
+    }
+  ],
+  "parameters": [
+    {
+      "name": "Pi1N",
+      "value": 1,
+      "status": "CONFIRMED",
+      "source": "parameter table"
+    },
+    {
+      "name": "rho",
+      "value": 0.025,
+      "status": "CONFIRMED",
+      "source": "parameter table"
+    },
+    {
+      "name": "alpha",
+      "value": 0.08,
+      "status": "CONFIRMED",
+      "source": "parameter table"
+    },
+    {
+      "name": "phi1",
+      "value": 0.02,
+      "status": "CONFIRMED",
+      "source": "parameter table"
+    },
+    {
+      "name": "beta1",
+      "value": 0.06,
+      "status": "CONFIRMED",
+      "source": "parameter table"
+    },
+    {
+      "name": "gamma",
+      "value": 0.00017,
+      "status": "CONFIRMED",
+      "source": "parameter table"
+    },
+    {
+      "name": "phi2",
+      "value": 0.00019,
+      "status": "CONFIRMED",
+      "source": "parameter table"
+    },
+    {
+      "name": "beta2",
+      "value": 0.002,
+      "status": "CONFIRMED",
+      "source": "parameter table"
+    },
+    {
+      "name": "db",
+      "value": 9.51,
+      "status": "CONFIRMED",
+      "source": "parameter table"
+    },
+    {
+      "name": "kappa",
+      "value": 0.025,
+      "status": "CONFIRMED",
+      "source": "parameter table"
+    },
+    {
+      "name": "beta3",
+      "value": 0.001,
+      "status": "CONFIRMED",
+      "source": "parameter table"
+    },
+    {
+      "name": "dmu",
+      "value": 0.277,
+      "status": "CONFIRMED",
+      "source": "parameter table"
+    },
+    {
+      "name": "phi3",
+      "value": 0.015,
+      "status": "CONFIRMED",
+      "source": "parameter table"
+    }
+  ],
+  "initial_conditions": {
+    "value": {
+      "FN": 0.14,
+      "IN": 0,
+      "Aβ": 1e-06,
+      "Tμ": 1e-06,
+      "Mρ": 0.02
+    },
+    "status": "CONFIRMED",
+    "source_pages": [
+      5
+    ],
+    "notes": []
+  },
+  "state_variables": {
+    "value": [
+      "FN(t)",
+      "IN(t)",
+      "Aβ(t)",
+      "Tμ(t)",
+      "Mρ(t)"
+    ],
+    "status": "PARTIAL",
+    "source_pages": [],
+    "notes": []
+  },
+  "numerical_methods": {
+    "value": [
+      "PINN) framework",
+      "PINN) framework for",
+      "Caputo derivative to accurately capture long term",
+      "PINN)",
+      "PINN exhibits superior accuracy and robustness",
+      "Caputo or Riemann-Liouville",
+      "Caputo-based",
+      "Caputo model",
+      "solvers and complicates",
+      "discretization methods",
+      "PINNs) embed known diﬀerential",
+      "PINNs such as hybrid optimization schemes, adaptive sampling",
+      "Caputo-Fabrizio derivatives and series solution techniques",
+      "solvers as benchmarks in data-driven methods",
+      "PINNs",
+      "PINNs have been eﬀectively applied to epidemic models such",
+      "PINNs further",
+      "PINN",
+      "PINN variants",
+      "PINN can improve",
+      "discretization (Bulut and Yigider,",
+      "PINN capabilities across biological",
+      "PINN",
+      "PINN approaches:",
+      "discretization,",
+      "PINNs",
+      "PINN studies focus on specialized",
+      "PINN frameworks that can eﬃciently balance physics",
+      "PINNs in modeling complex dynamical",
+      "PINNs unite mechanistic knowledge and",
+      "PINN) framework used to approximate fractional-order",
+      "PINN-based optimal",
+      "PINN is benchmarked against a",
+      "Grünwald Letnikov numerical solver to verify its ability to",
+      "Caputo fractional derivative of order",
+      "PINN) is",
+      "Caputo derivative is approximated",
+      "Grünwald-Letnikov scheme:",
+      "PINN to model nonlocal memory eﬀects present in",
+      "Caputo can be written as",
+      "Caputo derivatives will be:",
+      "Caputo fractional derivative of order σ",
+      "Caputo derivative gives,",
+      "Caputo sense,",
+      "Caputo operator",
+      "NSFD",
+      "NSFD scheme with ±10% parameter variations in neuronal",
+      "Caputo",
+      "Caputo derivative is approximated using the Grünwald-Letnikov",
+      "discretization, which expresses the fractional derivative as a",
+      "PINN (proposed method),",
+      "PINN obtained by setting the derivative order",
+      "discretizations to",
+      "PINN) incorporates",
+      "PINN",
+      "PINN, each state output is constrained by",
+      "Caputo derivative",
+      "Grünwald-Letnikov scheme",
+      "PINN, the same formulation is applied",
+      "Grünwald-Letnikov kernels, Automatic",
+      "PINN) relative to a purely data driven Baseline Neural",
+      "PINN",
+      "PINN",
+      "PINN, however begins with a lower",
+      "PINN captures inﬂammation dynamics more",
+      "PINN output shows a sharp decline and remains",
+      "PINN shows a rapid early drop",
+      "PINN enforces realistic decay under the",
+      "PINN begins at a value of 1",
+      "PINN and fractional-order PINN models under varying noise levels",
+      "PINN however",
+      "PINN exhibits only a mild increase",
+      "PINN",
+      "PINN shows a rapid degradation in performance, with ﬁnal loss",
+      "PINNs",
+      "PINN is justiﬁed by its substantial gains in robustness, stability",
+      "PINN",
+      "PINN",
+      "PINN exhibits a robustness ratio approximately",
+      "PINN,",
+      "PINN converges smoothly and stably, even at higher noise",
+      "PINN exhibits",
+      "PINN closely reproduces the GL reference",
+      "PINN deviates noticeably from the GL solution",
+      "PINN and fractional-order PINN",
+      "PINNs and",
+      "PINNs under increasing noise levels",
+      "PINN and fractional order PINN models",
+      "PINN",
+      "PINN",
+      "PINN and fractional-order PINN models",
+      "PINN",
+      "PINN",
+      "solver",
+      "PINN",
+      "Grünwald Letnikov",
+      "Caputo-type fractional",
+      "solver",
+      "PINN approach in capturing biologically meaningful dynamics",
+      "PINN leverages both data and domain",
+      "Caputo derivatives to capture long-term memory eﬀects",
+      "PINNs) showed strong potential for",
+      "PINNs coupled",
+      "Atangana, F",
+      "PINN,",
+      "PINN-s",
+      "PINN-un based solutions",
+      "PINN) evolution and beyond: a systematic literature review and",
+      "Atangana, F",
+      "Caputo derivative",
+      "Caputo",
+      "Caputo-"
+    ],
+    "status": "PARTIAL",
+    "source_pages": [],
+    "notes": []
+  },
+  "fractional_orders": {
+    "value": [
+      "α\n=\n1.0",
+      "α = 0.08",
+      "α = 0.7",
+      "α = 1"
+    ],
+    "status": "PARTIAL",
+    "source_pages": [],
+    "notes": []
+  },
+  "fractal_dimensions": {
+    "value": [
+      "β = 0"
+    ],
+    "status": "PARTIAL",
+    "source_pages": [],
+    "notes": []
+  },
+  "time_ranges": {
+    "value": [],
+    "status": "PARTIAL",
+    "source_pages": [],
+    "notes": []
+  },
+  "sensitivity_methodology": {
+    "value": [
+      "to ensure biological feasibility. Sensitivity analysis identiﬁes amyloid toxicity",
+      "of estimator variance and sensitivity to hyperparameters, which",
+      "sensitivity analysis and numerical simulations that illustrate the",
+      "basic reproduction number R0, reﬂecting the system’s sensitivity.",
+      "Three-dimensional sensitivity surfaces of the basic reproduction",
+      "3.10 Logarithmic sensitivity analysis",
+      "sensitivity",
+      "sensitivity in a normalized way.",
+      "sensitivity to α (amyloid beta toxicity) indicating vulnerability",
+      "shows sensitivity to κ and β3."
+    ],
+    "status": "PARTIAL",
+    "source_pages": [],
+    "notes": []
+  },
+  "noise_experiments": {
+    "value": [
+      "To assess robustness, additive Gaussian noise of varying intensity",
+      "Monte Carlo noise injection at multiple noise levels (0%–20%),",
+      "synthetic data, where Gaussian noise was deliberately added only",
+      "Average training time and MSE comparison for baseline, integer-order PINN and fractional-order PINN models under varying noise levels.",
+      "increasing observation noise. As the noise level increases from 0 to",
+      "increasing sharply as noise grows, indicating poor robustness",
+      "noise but does not encode any physical structure; therefore, its",
+      "Across all noise levels, the fractional model consistently produces",
+      "under noise, indicating that classical integer dynamics are",
+      "Robustness = Loss at 20% noise"
+    ],
+    "status": "PARTIAL",
+    "source_pages": [],
+    "notes": []
+  },
+  "neural_network_methodology": {
+    "value": [
+      "Informed Neural Network (PINN) framework",
+      "Network (PINN) framework for",
+      "in AD progression. Furthermore, a Physics Informed Neural Network (PINN)",
+      "standard neural networks the PINN exhibits superior accuracy and robustness",
+      "Neural Networks",
+      "Informed Neural Networks (PINNs) embed known diﬀerential",
+      "equations into neural network training by enforcing governing",
+      "PINNs such as hybrid optimization schemes, adaptive sampling",
+      "such as PINNs.",
+      "PINNs have been eﬀectively applied to epidemic models such",
+      "(Millevoi et al., 2023). Fractional extensions of PINNs further",
+      "memory eﬀects inherent in fractional PDEs. For example, PINN",
+      "2025). Other recent work explores enhanced PINN variants",
+      "specialized architecture variants like NRPINN can improve",
+      "2025). Moreover, expanded PINN capabilities across biological"
+    ],
+    "status": "PARTIAL",
+    "source_pages": [],
+    "notes": []
+  },
+  "control_variables": {
+    "value": [
+      "z1 ",
+      "z1(t)",
+      "z2(t)",
+      "z2)"
+    ],
+    "status": "PARTIAL",
+    "source_pages": [],
+    "notes": []
+  },
+  "validation_methodology": {
+    "value": [
+      "ensure a fair comparison.",
+      "plots oﬀer a clear comparison of the predicted trajectories from",
+      "Average training time and MSE comparison for baseline, integer-order PINN and fractional-order PINN models under varying noise levels.",
+      "Convergence behavior and robustness comparison of fractional-order and integer-order PINNs under increasing noise levels.",
+      "6.1 Comparison with a classical fractional",
+      "KN: Validation, Conceptualization, Writing – review & editing,"
+    ],
+    "status": "PARTIAL",
+    "source_pages": [],
+    "notes": []
+  },
+  "figures": [
+    {
+      "figure_id": "figure_01",
+      "source_document": "Papers\\fninf-20-1748481.pdf",
+      "caption": "shows how variations in key parameters inﬂuence the basic reproduction number R0, reﬂecting the system’s sensitivity.",
+      "plot_type": "unknown",
+      "x_variable": null,
+      "y_variable": null,
+      "variables": [
+        "S",
+        "E",
+        "T",
+        "C",
+        "IN"
+      ],
+      "fixed_parameters": {},
+      "varying_parameters": {},
+      "parameter_values": {},
+      "time_range": null,
+      "solver": null,
+      "inset_zoom": null,
+      "notes": [
+        "Caption extracted from page 7; review axis values and curves."
+      ],
+      "confidence": "PARTIAL",
+      "reproducibility_status": "NEEDS_REVIEW"
+    },
+    {
+      "figure_id": "figure_02",
+      "source_document": "Papers\\fninf-20-1748481.pdf",
+      "caption": ", the dynamics of the Alzheimer’s disease model compartments over 200 days are shown. The temporal evolution of functional neurons (FN), infected neurons (IN), amyloid beta (Aβ), tau protein (Tμ) and microglia (Mρ) are depicted. Frontiers in Neuroinformatics 11 frontiersin.org",
+      "plot_type": "line",
+      "x_variable": null,
+      "y_variable": null,
+      "variables": [
+        "S",
+        "E",
+        "T",
+        "C",
+        "FN",
+        "IN",
+        "Aβ",
+        "Tμ",
+        "Mρ"
+      ],
+      "fixed_parameters": {},
+      "varying_parameters": {},
+      "parameter_values": {},
+      "time_range": null,
+      "solver": null,
+      "inset_zoom": null,
+      "notes": [
+        "Caption extracted from page 11; review axis values and curves."
+      ],
+      "confidence": "PARTIAL",
+      "reproducibility_status": "NEEDS_REVIEW"
+    },
+    {
+      "figure_id": "figure_03",
+      "source_document": "Papers\\fninf-20-1748481.pdf",
+      "caption": "Time-dependent log-sensitivities of the Alzheimer model variables to ±10% perturbations in parameters. (a) Functional neurons (FN). (b) Infected neurons (IN). (c) Amyloid beta (Aβ). (d) Tau protein (Tm). (e) Microglia (Mρ). Frontiers in Neuroinformatics 13 frontiersin.org",
+      "plot_type": "unknown",
+      "x_variable": null,
+      "y_variable": null,
+      "variables": [
+        "S",
+        "E",
+        "T",
+        "C",
+        "FN",
+        "IN",
+        "Aβ",
+        "Mρ"
+      ],
+      "fixed_parameters": {},
+      "varying_parameters": {},
+      "parameter_values": {},
+      "time_range": null,
+      "solver": null,
+      "inset_zoom": null,
+      "notes": [
+        "Caption extracted from page 13; review axis values and curves."
+      ],
+      "confidence": "PARTIAL",
+      "reproducibility_status": "NEEDS_REVIEW"
+    },
+    {
+      "figure_id": "figure_04",
+      "source_document": "Papers\\fninf-20-1748481.pdf",
+      "caption": "Dynamics of FN (functional neurons) under ±10% parameter variation.",
+      "plot_type": "line",
+      "x_variable": null,
+      "y_variable": null,
+      "variables": [
+        "S",
+        "E",
+        "T",
+        "C",
+        "FN"
+      ],
+      "fixed_parameters": {},
+      "varying_parameters": {},
+      "parameter_values": {},
+      "time_range": null,
+      "solver": null,
+      "inset_zoom": null,
+      "notes": [
+        "Caption extracted from page 14; review axis values and curves."
+      ],
+      "confidence": "PARTIAL",
+      "reproducibility_status": "NEEDS_REVIEW"
+    },
+    {
+      "figure_id": "figure_05",
+      "source_document": "Papers\\fninf-20-1748481.pdf",
+      "caption": "Dynamics of IN (infected neurons) under ±10% parameter variation.",
+      "plot_type": "line",
+      "x_variable": null,
+      "y_variable": null,
+      "variables": [
+        "S",
+        "E",
+        "T",
+        "C",
+        "IN"
+      ],
+      "fixed_parameters": {},
+      "varying_parameters": {},
+      "parameter_values": {},
+      "time_range": null,
+      "solver": null,
+      "inset_zoom": null,
+      "notes": [
+        "Caption extracted from page 15; review axis values and curves."
+      ],
+      "confidence": "PARTIAL",
+      "reproducibility_status": "NEEDS_REVIEW"
+    },
+    {
+      "figure_id": "figure_07",
+      "source_document": "Papers\\fninf-20-1748481.pdf",
+      "caption": "Dynamics of Tμ (tau protein concentration) under ±10% parameter variation.",
+      "plot_type": "line",
+      "x_variable": null,
+      "y_variable": null,
+      "variables": [
+        "S",
+        "E",
+        "T",
+        "C",
+        "IN",
+        "Tμ"
+      ],
+      "fixed_parameters": {},
+      "varying_parameters": {},
+      "parameter_values": {},
+      "time_range": null,
+      "solver": null,
+      "inset_zoom": null,
+      "notes": [
+        "Caption extracted from page 16; review axis values and curves."
+      ],
+      "confidence": "PARTIAL",
+      "reproducibility_status": "NEEDS_REVIEW"
+    },
+    {
+      "figure_id": "figure_09",
+      "source_document": "Papers\\fninf-20-1748481.pdf",
+      "caption": "Dynamics of functional neurons (FN) for different fractional orders α.",
+      "plot_type": "line",
+      "x_variable": null,
+      "y_variable": null,
+      "variables": [
+        "S",
+        "E",
+        "T",
+        "C",
+        "FN"
+      ],
+      "fixed_parameters": {},
+      "varying_parameters": {
+        "alpha": [
+          0.7,
+          0.8,
+          0.9,
+          1.0
+        ]
+      },
+      "parameter_values": {},
+      "time_range": null,
+      "solver": null,
+      "inset_zoom": null,
+      "notes": [
+        "Caption extracted from page 17; review axis values and curves.",
+        "The surrounding text reports alpha={0.7,0.8,0.9,1.0}; displayed legends and scales should be reviewed."
+      ],
+      "confidence": "PARTIAL",
+      "reproducibility_status": "NEEDS_REVIEW"
+    },
+    {
+      "figure_id": "figure_11",
+      "source_document": "Papers\\fninf-20-1748481.pdf",
+      "caption": "Dynamics of amyloid beta (Aβ) for varying fractional orders α.",
+      "plot_type": "line",
+      "x_variable": null,
+      "y_variable": null,
+      "variables": [
+        "S",
+        "E",
+        "T",
+        "C",
+        "IN",
+        "Aβ"
+      ],
+      "fixed_parameters": {},
+      "varying_parameters": {
+        "alpha": [
+          0.7,
+          0.8,
+          0.9,
+          1.0
+        ]
+      },
+      "parameter_values": {},
+      "time_range": null,
+      "solver": null,
+      "inset_zoom": null,
+      "notes": [
+        "Caption extracted from page 17; review axis values and curves.",
+        "The surrounding text reports alpha={0.7,0.8,0.9,1.0}; displayed legends and scales should be reviewed."
+      ],
+      "confidence": "PARTIAL",
+      "reproducibility_status": "NEEDS_REVIEW"
+    },
+    {
+      "figure_id": "figure_14",
+      "source_document": "Papers\\fninf-20-1748481.pdf",
+      "caption": "Time evolution of the model state and control variables: age-structured susceptible population, ﬁrst infected class, second infected class, disease progression variable, treated compartment, population response variable, optimal control z1(t), and optimal control z2(t). Frontiers in Neuroinformatics 18 frontiersin.org",
+      "plot_type": "unknown",
+      "x_variable": null,
+      "y_variable": null,
+      "variables": [
+        "S",
+        "E",
+        "T",
+        "C",
+        "IN"
+      ],
+      "fixed_parameters": {},
+      "varying_parameters": {},
+      "parameter_values": {},
+      "time_range": null,
+      "solver": null,
+      "inset_zoom": null,
+      "notes": [
+        "Caption extracted from page 18; review axis values and curves."
+      ],
+      "confidence": "PARTIAL",
+      "reproducibility_status": "NEEDS_REVIEW"
+    },
+    {
+      "figure_id": "figure_16",
+      "source_document": "Papers\\fninf-20-1748481.pdf",
+      "caption": "Convergence behavior and robustness comparison of fractional-order and integer-order PINNs under increasing noise levels. TABLE 3 Final loss and training time statistics for baseline, integerorder PINN and fractional order PINN models. Model Final loss Training time (s) Mean Std Min Max Mean Std Baseline",
+      "plot_type": "unknown",
+      "x_variable": null,
+      "y_variable": null,
+      "variables": [
+        "S",
+        "E",
+        "T",
+        "C",
+        "IN"
+      ],
+      "fixed_parameters": {},
+      "varying_parameters": {},
+      "parameter_values": {},
+      "time_range": null,
+      "solver": null,
+      "inset_zoom": null,
+      "notes": [
+        "Caption extracted from page 20; review axis values and curves."
+      ],
+      "confidence": "PARTIAL",
+      "reproducibility_status": "NEEDS_REVIEW"
+    },
+    {
+      "figure_id": "figure_18",
+      "source_document": "Papers\\fninf-20-1748481.pdf",
+      "caption": "Frontiers in Neuroinformatics 20 frontiersin.org",
+      "plot_type": "unknown",
+      "x_variable": null,
+      "y_variable": null,
+      "variables": [
+        "S",
+        "E",
+        "T",
+        "C",
+        "IN"
+      ],
+      "fixed_parameters": {},
+      "varying_parameters": {},
+      "parameter_values": {},
+      "time_range": null,
+      "solver": null,
+      "inset_zoom": null,
+      "notes": [
+        "Caption extracted from page 20; review axis values and curves."
+      ],
+      "confidence": "PARTIAL",
+      "reproducibility_status": "NEEDS_REVIEW"
+    }
+  ],
+  "uncertainties": [
+    "Automated PDF extraction is layout-sensitive; equation text and captions require human review."
+  ],
+  "assumptions": [],
+  "unresolved_information": [
+    "Paper 2 omits sufficient controlled-equation details for exact control reproduction.",
+    "Paper 2 does not specify enough NSFD/training hyperparameters for exact PINN reproduction.",
+    "Some Paper 2 figure descriptions/scales conflict with surrounding text or tables."
+  ]
+}

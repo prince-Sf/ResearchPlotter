@@ -1,0 +1,115 @@
+model:
+  name: alzheimer_fractional_model
+  type: fractional
+  derivative_type: grunwald_letnikov
+  fractional_order: 0.9
+  states:
+  - FN
+  - IN
+  - Abeta
+  - Tmu
+  - Mrho
+  equations:
+    FN: Pi1N + rho*Tmu - alpha*FN*Abeta - phi1*FN
+    IN: alpha*FN*Abeta - beta1*IN*Mrho - (gamma+phi2)*IN
+    Abeta: gamma*IN - beta2*Abeta*Mrho - (db+kappa)*Abeta
+    Tmu: kappa*Abeta - beta3*Tmu*Mrho - (dmu+rho)*Tmu
+    Mrho: (beta1*IN+beta2*Abeta+beta3*Tmu)*Mrho - phi3*Mrho
+  controls:
+    variables:
+    - z1
+    - z2
+    equations_status: BLOCKED
+  nsfd_status: PARTIAL
+  training_hyperparameters_status: BLOCKED
+solver:
+  type: grunwald_letnikov
+  options:
+    fractional_order: 0.9
+time:
+  start: 0.0
+  end: 200.0
+  step: 1.0
+parameters:
+  Pi1N: 1.0
+  rho: 0.025
+  alpha: 0.08
+  phi1: 0.02
+  beta1: 0.06
+  gamma: 0.00017
+  phi2: 0.00019
+  beta2: 0.002
+  db: 9.51
+  kappa: 0.025
+  beta3: 0.001
+  dmu: 0.277
+  phi3: 0.015
+initial_conditions:
+  FN: 0.14
+  IN: 0.0
+  Abeta: 1.0e-06
+  Tmu: 1.0e-06
+  Mrho: 0.02
+controls:
+  variables:
+  - z1
+  - z2
+  equations: {}
+  values: {}
+  status: BLOCKED
+  provenance: UNKNOWN
+  notes:
+  - Supply complete controlled right-hand sides here; the paper does not provide them
+    sufficiently.
+nsfd:
+  enabled: false
+  scheme: null
+  settings: {}
+  status: PARTIAL
+  provenance: UNKNOWN
+  notes:
+  - Supply the NSFD denominator/update details before claiming a reproduction.
+pinn:
+  enabled: false
+  hidden_layers: null
+  num_hidden_layers: null
+  hidden_units: null
+  activation: null
+  optimizer: null
+  learning_rate: null
+  epochs: null
+  collocation_points: null
+  data_points: null
+  physics_loss_weight: null
+  initial_condition_loss_weight: null
+  device: cpu
+  network: null
+  provenance: UNKNOWN
+  notes:
+  - Supply architecture and training values to run a configured PINN experiment.
+noise_levels:
+- 0.0
+- 0.05
+- 0.1
+- 0.15
+- 0.2
+run_convergence: false
+refinements:
+- 1
+- 2
+- 4
+provenance:
+  model: SOURCE_PAPER
+  parameters: SOURCE_PAPER
+  initial_conditions: SOURCE_PAPER
+  fractional_order: SOURCE_PAPER
+  controls: UNKNOWN
+  nsfd: UNKNOWN
+  pinn: UNKNOWN
+metadata:
+  source_document: Papers/fninf-20-1748481.pdf
+  evidence_status: PARTIAL
+  unresolved:
+  - controlled equations
+  - NSFD details
+  - PINN architecture and training hyperparameters

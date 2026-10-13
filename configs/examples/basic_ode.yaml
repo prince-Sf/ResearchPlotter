@@ -1,0 +1,23 @@
+model:
+  name: logistic
+  states: [population]
+  equations:
+    population: r*population*(1-population/K)
+  sweep:
+    r: [0.4, 0.6, 0.8]
+  derivative_type: ordinary
+solver:
+  type: ode
+time:
+  start: 0
+  end: 10
+  step: 0.1
+parameters:
+  r: 0.6
+  K: 1.0
+initial_conditions:
+  population: 0.1
+plots:
+  - type: line
+    x: time
+    y: population

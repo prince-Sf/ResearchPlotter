@@ -1,0 +1,34 @@
+{
+  "source_document": "Papers\\333.pdf",
+  "analysis_report": "outputs\\paper_reproduction\\paper_1\\paper_analysis.json",
+  "figure_manifests": "outputs\\paper_reproduction\\paper_1\\figure_manifests.json",
+  "status": "BLOCKED",
+  "warnings": [
+    "BLOCKED: paper does not clearly provide all simulation initial conditions and step-size details.",
+    "BLOCKED: displayed recurrence has an index-at-zero ambiguity.",
+    "NEEDS_REVIEW: Figure 11 ks and Figure 12 kT sweep values are not tabulated in the source."
+  ],
+  "experiments": [],
+  "paper_notes": {
+    "status": "BLOCKED",
+    "confirmed": [
+      "state variables S,E,T,C",
+      "parameter table values",
+      "Figures 1-12 parameter sweep descriptions",
+      "generalized Mittag-Leffler/fractal-fractional formulation"
+    ],
+    "unresolved": [
+      "simulation initial conditions",
+      "numerical step size",
+      "index-at-zero ambiguity in displayed recurrence"
+    ],
+    "assumptions": []
+  },
+  "unresolved_experiments": [
+    "Figure 11 (ks) and Figure 12 (kT) parameter values are not tabulated in the source."
+  ],
+  "unresolved_information": [
+    "Supply initial_conditions, time_end, and step after reviewing paper_analysis.json.",
+    "Review the Figure 11 ks and Figure 12 kT sweep values before running those experiments."
+  ]
+}

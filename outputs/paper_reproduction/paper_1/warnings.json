@@ -1,0 +1,5 @@
+[
+  "BLOCKED: paper does not clearly provide all simulation initial conditions and step-size details.",
+  "BLOCKED: displayed recurrence has an index-at-zero ambiguity.",
+  "NEEDS_REVIEW: Figure 11 ks and Figure 12 kT sweep values are not tabulated in the source."
+]

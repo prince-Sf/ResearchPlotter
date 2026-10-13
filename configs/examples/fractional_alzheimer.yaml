@@ -1,0 +1,39 @@
+model:
+  name: alzheimer_demo
+  states: [FN, IN, Abeta, Tmu, Mrho]
+  equations:
+    FN: Pi1N+rho*Tmu-alpha*FN*Abeta-phi1*FN
+    IN: alpha*FN*Abeta-beta1*IN*Mrho-(gamma+phi2)*IN
+    Abeta: gamma*IN-beta2*Abeta*Mrho-(db+kappa)*Abeta
+    Tmu: kappa*Abeta-beta3*Tmu*Mrho-(dmu+rho)*Tmu
+    Mrho: (beta1*IN+beta2*Abeta+beta3*Tmu)*Mrho-phi3*Mrho
+  derivative_type: fractional
+  fractional_order: 0.9
+solver:
+  type: grunwald_letnikov
+  options:
+    fractional_order: 0.9
+time:
+  start: 0
+  end: 20
+  step: 0.1
+parameters:
+  Pi1N: 1.0
+  rho: 0.025
+  alpha: 0.08
+  phi1: 0.02
+  beta1: 0.06
+  gamma: 0.00017
+  phi2: 0.00019
+  beta2: 0.002
+  db: 9.51
+  kappa: 0.025
+  beta3: 0.001
+  dmu: 0.277
+  phi3: 0.015
+initial_conditions:
+  FN: 0.14
+  IN: 0.0
+  Abeta: 0.000001
+  Tmu: 0.000001
+  Mrho: 0.02

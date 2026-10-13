@@ -1,0 +1,409 @@
+[
+  {
+    "figure_id": "figure_01",
+    "source_document": "Papers\\333.pdf",
+    "caption": "Dynamic behavior of the cancer model.",
+    "plot_type": "unknown",
+    "x_variable": null,
+    "y_variable": null,
+    "variables": [
+      "E",
+      "T",
+      "C"
+    ],
+    "fixed_parameters": {},
+    "varying_parameters": {},
+    "parameter_values": {},
+    "time_range": null,
+    "solver": null,
+    "inset_zoom": null,
+    "notes": [
+      "Caption extracted from page 8; review axis values and curves."
+    ],
+    "confidence": "PARTIAL",
+    "reproducibility_status": "NEEDS_REVIEW"
+  },
+  {
+    "figure_id": "figure_03",
+    "source_document": "Papers\\333.pdf",
+    "caption": "Concentration of the effectors cells over time for different 𝛼and 𝛽= 0.6.",
+    "plot_type": "line",
+    "x_variable": null,
+    "y_variable": null,
+    "variables": [
+      "S",
+      "E",
+      "T",
+      "C"
+    ],
+    "fixed_parameters": {
+      "beta": 0.6
+    },
+    "varying_parameters": {
+      "alpha": [
+        0.95,
+        0.97,
+        1.0
+      ]
+    },
+    "parameter_values": {
+      "alpha": [
+        0.95,
+        0.97,
+        1.0
+      ],
+      "beta": 0.6
+    },
+    "time_range": null,
+    "solver": null,
+    "inset_zoom": null,
+    "notes": [
+      "Caption extracted from page 9; review axis values and curves.",
+      "Values read from the figure description; initial conditions and step size remain unresolved."
+    ],
+    "confidence": "PARTIAL",
+    "reproducibility_status": "NEEDS_REVIEW"
+  },
+  {
+    "figure_id": "figure_04",
+    "source_document": "Papers\\333.pdf",
+    "caption": "Concentration of the tumor cells over time for different 𝛼and 𝛽= 0.6.",
+    "plot_type": "line",
+    "x_variable": null,
+    "y_variable": null,
+    "variables": [
+      "S",
+      "E",
+      "T",
+      "C"
+    ],
+    "fixed_parameters": {
+      "beta": 0.6
+    },
+    "varying_parameters": {
+      "alpha": [
+        0.95,
+        0.97,
+        1.0
+      ]
+    },
+    "parameter_values": {
+      "alpha": [
+        0.95,
+        0.97,
+        1.0
+      ],
+      "beta": 0.6
+    },
+    "time_range": null,
+    "solver": null,
+    "inset_zoom": null,
+    "notes": [
+      "Caption extracted from page 9; review axis values and curves.",
+      "Values read from the figure description; initial conditions and step size remain unresolved."
+    ],
+    "confidence": "PARTIAL",
+    "reproducibility_status": "NEEDS_REVIEW"
+  },
+  {
+    "figure_id": "figure_06",
+    "source_document": "Papers\\333.pdf",
+    "caption": "Concentration of the steam cells over time for 𝛼= 0.95 and different 𝛽.",
+    "plot_type": "line",
+    "x_variable": null,
+    "y_variable": null,
+    "variables": [
+      "S",
+      "E",
+      "T",
+      "C"
+    ],
+    "fixed_parameters": {
+      "alpha": 0.95
+    },
+    "varying_parameters": {
+      "beta": [
+        0.6,
+        0.7,
+        0.8
+      ]
+    },
+    "parameter_values": {},
+    "time_range": null,
+    "solver": null,
+    "inset_zoom": null,
+    "notes": [
+      "Caption extracted from page 9; review axis values and curves."
+    ],
+    "confidence": "PARTIAL",
+    "reproducibility_status": "NEEDS_REVIEW"
+  },
+  {
+    "figure_id": "figure_02",
+    "source_document": "Papers\\333.pdf",
+    "caption": "Concentration of the steam cells over time for different 𝛼and 𝛽= 0.6.",
+    "plot_type": "line",
+    "x_variable": null,
+    "y_variable": null,
+    "variables": [
+      "S",
+      "E",
+      "T",
+      "C"
+    ],
+    "fixed_parameters": {
+      "beta": 0.6
+    },
+    "varying_parameters": {
+      "alpha": [
+        0.95,
+        0.97,
+        1.0
+      ]
+    },
+    "parameter_values": {
+      "alpha": [
+        0.95,
+        0.97,
+        1.0
+      ],
+      "beta": 0.6
+    },
+    "time_range": null,
+    "solver": null,
+    "inset_zoom": null,
+    "notes": [
+      "Caption extracted from page 9; review axis values and curves.",
+      "Values read from the figure description; initial conditions and step size remain unresolved."
+    ],
+    "confidence": "PARTIAL",
+    "reproducibility_status": "NEEDS_REVIEW"
+  },
+  {
+    "figure_id": "figure_07",
+    "source_document": "Papers\\333.pdf",
+    "caption": "Concentration of the effectors cells over time for 𝛼= 0.95 and different 𝛽. Computer Methods and Programs in Biomedicine 260 (2025) 108565 9",
+    "plot_type": "line",
+    "x_variable": null,
+    "y_variable": null,
+    "variables": [
+      "S",
+      "E",
+      "T",
+      "C",
+      "IN"
+    ],
+    "fixed_parameters": {
+      "alpha": 0.95
+    },
+    "varying_parameters": {
+      "beta": [
+        0.6,
+        0.7,
+        0.8
+      ]
+    },
+    "parameter_values": {},
+    "time_range": null,
+    "solver": null,
+    "inset_zoom": null,
+    "notes": [
+      "Caption extracted from page 9; review axis values and curves."
+    ],
+    "confidence": "PARTIAL",
+    "reproducibility_status": "NEEDS_REVIEW"
+  },
+  {
+    "figure_id": "figure_08",
+    "source_document": "Papers\\333.pdf",
+    "caption": "Concentration of the tumor cells over time for 𝛼= 0.95 and different 𝛽.",
+    "plot_type": "line",
+    "x_variable": null,
+    "y_variable": null,
+    "variables": [
+      "S",
+      "E",
+      "T",
+      "C"
+    ],
+    "fixed_parameters": {
+      "alpha": 0.95
+    },
+    "varying_parameters": {
+      "beta": [
+        0.6,
+        0.7,
+        0.8
+      ]
+    },
+    "parameter_values": {},
+    "time_range": null,
+    "solver": null,
+    "inset_zoom": null,
+    "notes": [
+      "Caption extracted from page 10; review axis values and curves."
+    ],
+    "confidence": "PARTIAL",
+    "reproducibility_status": "NEEDS_REVIEW"
+  },
+  {
+    "figure_id": "figure_12",
+    "source_document": "Papers\\333.pdf",
+    "caption": "Concentration of the tumor cells over time for different values of 𝑘𝑇.",
+    "plot_type": "line",
+    "x_variable": null,
+    "y_variable": null,
+    "variables": [
+      "S",
+      "E",
+      "T",
+      "C"
+    ],
+    "fixed_parameters": {},
+    "varying_parameters": {
+      "kT": []
+    },
+    "parameter_values": {},
+    "time_range": null,
+    "solver": null,
+    "inset_zoom": null,
+    "notes": [
+      "Caption extracted from page 10; review axis values and curves.",
+      "Parameter is varied, but the plotted values are not explicitly tabulated in the source."
+    ],
+    "confidence": "PARTIAL",
+    "reproducibility_status": "NEEDS_REVIEW"
+  },
+  {
+    "figure_id": "figure_05",
+    "source_document": "Papers\\333.pdf",
+    "caption": "Concentration of the chemotherapy drug over time for different 𝛼and 𝛽= 0.6.",
+    "plot_type": "line",
+    "x_variable": null,
+    "y_variable": null,
+    "variables": [
+      "E",
+      "T",
+      "C"
+    ],
+    "fixed_parameters": {
+      "beta": 0.6
+    },
+    "varying_parameters": {
+      "alpha": [
+        0.95,
+        0.97,
+        1.0
+      ]
+    },
+    "parameter_values": {
+      "alpha": [
+        0.95,
+        0.97,
+        1.0
+      ],
+      "beta": 0.6
+    },
+    "time_range": null,
+    "solver": null,
+    "inset_zoom": null,
+    "notes": [
+      "Caption extracted from page 9; review axis values and curves.",
+      "Values read from the figure description; initial conditions and step size remain unresolved."
+    ],
+    "confidence": "PARTIAL",
+    "reproducibility_status": "NEEDS_REVIEW"
+  },
+  {
+    "figure_id": "figure_09",
+    "source_document": "Papers\\333.pdf",
+    "caption": "Concentration of the chemotherapy drug over time for 𝛼= 0.95 and different 𝛽.",
+    "plot_type": "line",
+    "x_variable": null,
+    "y_variable": null,
+    "variables": [
+      "E",
+      "T",
+      "C"
+    ],
+    "fixed_parameters": {
+      "alpha": 0.95
+    },
+    "varying_parameters": {
+      "beta": [
+        0.6,
+        0.7,
+        0.8
+      ]
+    },
+    "parameter_values": {},
+    "time_range": null,
+    "solver": null,
+    "inset_zoom": null,
+    "notes": [
+      "Caption extracted from page 10; review axis values and curves."
+    ],
+    "confidence": "PARTIAL",
+    "reproducibility_status": "NEEDS_REVIEW"
+  },
+  {
+    "figure_id": "figure_10",
+    "source_document": "Papers\\333.pdf",
+    "caption": "Concentration of the steam cells over time for different values of 𝛿2.",
+    "plot_type": "line",
+    "x_variable": null,
+    "y_variable": null,
+    "variables": [
+      "S",
+      "E",
+      "T",
+      "C"
+    ],
+    "fixed_parameters": {},
+    "varying_parameters": {
+      "delta2": [
+        5.4,
+        6.4,
+        7.4
+      ]
+    },
+    "parameter_values": {},
+    "time_range": null,
+    "solver": null,
+    "inset_zoom": null,
+    "notes": [
+      "Caption extracted from page 10; review axis values and curves.",
+      "The source describes an increase from 5.4 to 7.4; intermediate values are not explicitly tabulated."
+    ],
+    "confidence": "PARTIAL",
+    "reproducibility_status": "NEEDS_REVIEW"
+  },
+  {
+    "figure_id": "figure_11",
+    "source_document": "Papers\\333.pdf",
+    "caption": "Concentration of the steam cells over time for different values of 𝑘𝑠.",
+    "plot_type": "line",
+    "x_variable": null,
+    "y_variable": null,
+    "variables": [
+      "S",
+      "E",
+      "T",
+      "C"
+    ],
+    "fixed_parameters": {},
+    "varying_parameters": {
+      "ks": []
+    },
+    "parameter_values": {},
+    "time_range": null,
+    "solver": null,
+    "inset_zoom": null,
+    "notes": [
+      "Caption extracted from page 10; review axis values and curves.",
+      "Parameter is varied, but the plotted values are not explicitly tabulated in the source."
+    ],
+    "confidence": "PARTIAL",
+    "reproducibility_status": "NEEDS_REVIEW"
+  }
+]

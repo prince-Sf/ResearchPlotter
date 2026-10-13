@@ -1,0 +1,12 @@
+{
+  "status": "INVALID",
+  "finite": false,
+  "shape_ok": true,
+  "warnings": [
+    "Reference GL implementation uses an explicit update; refine the grid and assess convergence.",
+    "Simulation contains NaN or infinite values",
+    "Simulation violates the requested nonnegativity constraint"
+  ],
+  "min_state": -6.970424598703997e+155,
+  "max_state": 6.970424598712897e+155
+}

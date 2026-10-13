@@ -1,0 +1,11 @@
+time,signal,group
+0,0.12,control
+1,0.31,control
+2,0.46,control
+3,0.52,control
+4,0.58,control
+0,0.10,treatment
+1,0.24,treatment
+2,0.35,treatment
+3,0.40,treatment
+4,0.43,treatment

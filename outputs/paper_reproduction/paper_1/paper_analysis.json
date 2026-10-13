@@ -1,0 +1,744 @@
+{
+  "source_document": "Papers\\333.pdf",
+  "page_count": 12,
+  "title": {
+    "value": "Dynamic analysis of fractal–fractional cancer model under chemotherapy drug with generalized Mittag-Leffler kernel",
+    "status": "PARTIAL",
+    "source_pages": [
+      1
+    ],
+    "notes": []
+  },
+  "authors": {
+    "value": "Hardik Joshi; Mehmet Yavuz; Osman Taylan; Abdulaziz Alkabaa",
+    "status": "PARTIAL",
+    "source_pages": [
+      1
+    ],
+    "notes": []
+  },
+  "sections": [
+    "1\nSection 2.8. The numerical values of parameters used to simulate the"
+  ],
+  "equations": [
+    {
+      "equation_number": "6",
+      "text": "𝑑 𝑡= 𝑔(1 −𝑘𝑇)𝑇− (𝛿4𝐸+ 𝑘𝑇𝐶)𝑇 ,",
+      "status": "PARTIAL",
+      "source_page": 3
+    },
+    {
+      "equation_number": "7",
+      "text": "𝐶= −𝛿2𝐶+ 𝐽(𝑡),",
+      "status": "PARTIAL",
+      "source_page": 3
+    },
+    {
+      "equation_number": "8",
+      "text": "𝑆|𝑆=0 = 0 ≥0,",
+      "status": "PARTIAL",
+      "source_page": 3
+    },
+    {
+      "equation_number": "9",
+      "text": "𝐶|𝐶=0 = 𝐽(𝑡) ≥0.",
+      "status": "PARTIAL",
+      "source_page": 3
+    },
+    {
+      "equation_number": "10",
+      "text": "𝑇= 𝑔(1 −𝑘𝑇)𝑇−𝛿4𝐸 𝑇 ,",
+      "status": "PARTIAL",
+      "source_page": 4
+    },
+    {
+      "equation_number": "11",
+      "text": "𝑔(1 −𝑘𝑇)𝑇−𝛿4𝐸 𝑇= 0.",
+      "status": "PARTIAL",
+      "source_page": 4
+    },
+    {
+      "equation_number": "16",
+      "text": "𝜆2 + 𝑐1𝜆+ 𝑐2 = 0,",
+      "status": "PARTIAL",
+      "source_page": 4
+    },
+    {
+      "equation_number": "17",
+      "text": "𝐶= −𝛿2𝐶+ 𝐽(𝑡),",
+      "status": "PARTIAL",
+      "source_page": 4
+    },
+    {
+      "equation_number": "18",
+      "text": "−𝛿2𝐶+ 𝐽(𝑡) = 0.",
+      "status": "PARTIAL",
+      "source_page": 4
+    },
+    {
+      "equation_number": "19",
+      "text": "𝑚1𝑇∗∗2 + 𝑚2𝑇∗∗+ 𝑚3 = 0,",
+      "status": "PARTIAL",
+      "source_page": 4
+    },
+    {
+      "equation_number": "24",
+      "text": "𝜆2 + 𝑎1𝜆+ 𝑎2 = 0,",
+      "status": "PARTIAL",
+      "source_page": 4
+    },
+    {
+      "equation_number": "20",
+      "text": "treatment is locally asymptotically stable provided the condition",
+      "status": "PARTIAL",
+      "source_page": 5
+    },
+    {
+      "equation_number": "27",
+      "text": "𝛬4(𝑡, 𝐶) = −𝛿2𝐶+ 𝐽(𝑡).",
+      "status": "PARTIAL",
+      "source_page": 5
+    },
+    {
+      "equation_number": "7",
+      "text": "Similarly, the solution of the remaining class of FFM cancer model",
+      "status": "PARTIAL",
+      "source_page": 5
+    },
+    {
+      "equation_number": "35",
+      "text": "Similarly, the successive difference of the remaining equations of",
+      "status": "PARTIAL",
+      "source_page": 6
+    },
+    {
+      "equation_number": "37",
+      "text": "Similarly, we considered the norm on every difference equation of",
+      "status": "PARTIAL",
+      "source_page": 6
+    },
+    {
+      "equation_number": "40",
+      "text": "𝛩4𝑛(𝑡) = 𝐶𝑛+1(𝑡) −𝐶𝑛(𝑡).",
+      "status": "PARTIAL",
+      "source_page": 6
+    },
+    {
+      "equation_number": "54",
+      "text": "𝑡𝐶(𝑡) = 𝛽 𝑡𝛽−1𝑓4(𝑆 , 𝐸 , 𝑇 , 𝐶 , 𝑡).",
+      "status": "PARTIAL",
+      "source_page": 7
+    },
+    {
+      "equation_number": "21",
+      "text": "[5] V.T. DeVita, E. Chu, A history of cancer chemotherapy, Cancer Res. 68",
+      "status": "PARTIAL",
+      "source_page": 11
+    },
+    {
+      "equation_number": "1",
+      "text": "CD4+T under non-singular kernel derivative, Appl. Math. Nonlinear Sci. 5",
+      "status": "PARTIAL",
+      "source_page": 11
+    },
+    {
+      "equation_number": "3",
+      "text": "model with the Caputo–Fabrizio fractional derivative, Eur. Phys. J. Plus 133",
+      "status": "PARTIAL",
+      "source_page": 12
+    }
+  ],
+  "parameters": [
+    {
+      "name": "delta1",
+      "value": -0.02825,
+      "status": "CONFIRMED",
+      "source": "parameter table"
+    },
+    {
+      "name": "ks",
+      "value": 1,
+      "status": "CONFIRMED",
+      "source": "parameter table"
+    },
+    {
+      "name": "gamma",
+      "value": 0.17,
+      "status": "CONFIRMED",
+      "source": "parameter table"
+    },
+    {
+      "name": "mu",
+      "value": 0.03,
+      "status": "CONFIRMED",
+      "source": "parameter table"
+    },
+    {
+      "name": "xi1",
+      "value": 0.1245,
+      "status": "CONFIRMED",
+      "source": "parameter table"
+    },
+    {
+      "name": "delta3",
+      "value": 1,
+      "status": "CONFIRMED",
+      "source": "parameter table"
+    },
+    {
+      "name": "g",
+      "value": 0.18,
+      "status": "CONFIRMED",
+      "source": "parameter table"
+    },
+    {
+      "name": "k",
+      "value": 1e-09,
+      "status": "CONFIRMED",
+      "source": "parameter table"
+    },
+    {
+      "name": "delta4",
+      "value": 0.9,
+      "status": "CONFIRMED",
+      "source": "parameter table"
+    },
+    {
+      "name": "kT",
+      "value": 0.9,
+      "status": "CONFIRMED",
+      "source": "parameter table"
+    },
+    {
+      "name": "delta2",
+      "value": 6.4,
+      "status": "CONFIRMED",
+      "source": "parameter table"
+    },
+    {
+      "name": "J(t)",
+      "value": 1,
+      "status": "CONFIRMED",
+      "source": "parameter table"
+    }
+  ],
+  "initial_conditions": {
+    "value": [],
+    "status": "NEEDS_REVIEW",
+    "source_pages": [],
+    "notes": [
+      "Paper 1 values must be supplied or confirmed from a paper table before simulation."
+    ]
+  },
+  "state_variables": {
+    "value": [
+      "S(t)",
+      "E(t)",
+      "T(t)",
+      "C(t)"
+    ],
+    "status": "PARTIAL",
+    "source_pages": [],
+    "notes": []
+  },
+  "numerical_methods": {
+    "value": [
+      "Atangana–Baleanu derivative [24]",
+      "Caputo time fractional derivative [27]",
+      "Caputo–Fabrizio deriva-",
+      "Caputo–Fabrizio frac-",
+      "Atangana method [34]",
+      "Atangana–",
+      "numerical scheme for the fractal–fractional",
+      "Caputo fractional derivative (CFD) of a function 𝜗(𝑡)",
+      "Caputo sense of order 𝛼and",
+      "Caputo sense of order 𝛼and fractal dimension 𝛽is defined as",
+      "Caputo sense",
+      "Caputo differentia-",
+      "Numerical scheme",
+      "numerical scheme of the FFM",
+      "Atangana–Baleanu Caputo sense as follows",
+      "Atangana–Baleanu integral to Eq",
+      "Caputo–Fabrizio and Atangana-Baleanu fractional derivatives to",
+      "Caputo time fractional derivative,",
+      "Caputo fractional derivatives,",
+      "Caputo–Fabrizio fractional derivative, Eur",
+      "Atangana, S",
+      "Atangana, Fractal-fractional differentiation and integration: Connecting fractal",
+      "discretization scheme,",
+      "solver, Axioms 2024 13 (10) (2024) 689"
+    ],
+    "status": "PARTIAL",
+    "source_pages": [],
+    "notes": []
+  },
+  "fractional_orders": {
+    "value": [],
+    "status": "PARTIAL",
+    "source_pages": [],
+    "notes": []
+  },
+  "fractal_dimensions": {
+    "value": [],
+    "status": "PARTIAL",
+    "source_pages": [],
+    "notes": []
+  },
+  "time_ranges": {
+    "value": [],
+    "status": "PARTIAL",
+    "source_pages": [],
+    "notes": []
+  },
+  "sensitivity_methodology": {
+    "value": [],
+    "status": "UNCERTAIN",
+    "source_pages": [],
+    "notes": []
+  },
+  "noise_experiments": {
+    "value": [
+      "independent Gaussian white noises on the behavior of a stochastic epidemic"
+    ],
+    "status": "PARTIAL",
+    "source_pages": [],
+    "notes": []
+  },
+  "neural_network_methodology": {
+    "value": [],
+    "status": "UNCERTAIN",
+    "source_pages": [],
+    "notes": []
+  },
+  "control_variables": {
+    "value": [],
+    "status": "UNCERTAIN",
+    "source_pages": [],
+    "notes": []
+  },
+  "validation_methodology": {
+    "value": [
+      "& editing, Visualization, Validation, Formal analysis."
+    ],
+    "status": "PARTIAL",
+    "source_pages": [],
+    "notes": []
+  },
+  "figures": [
+    {
+      "figure_id": "figure_01",
+      "source_document": "Papers\\333.pdf",
+      "caption": "Dynamic behavior of the cancer model.",
+      "plot_type": "unknown",
+      "x_variable": null,
+      "y_variable": null,
+      "variables": [
+        "E",
+        "T",
+        "C"
+      ],
+      "fixed_parameters": {},
+      "varying_parameters": {},
+      "parameter_values": {},
+      "time_range": null,
+      "solver": null,
+      "inset_zoom": null,
+      "notes": [
+        "Caption extracted from page 8; review axis values and curves."
+      ],
+      "confidence": "PARTIAL",
+      "reproducibility_status": "NEEDS_REVIEW"
+    },
+    {
+      "figure_id": "figure_03",
+      "source_document": "Papers\\333.pdf",
+      "caption": "Concentration of the effectors cells over time for different 𝛼and 𝛽= 0.6.",
+      "plot_type": "line",
+      "x_variable": null,
+      "y_variable": null,
+      "variables": [
+        "S",
+        "E",
+        "T",
+        "C"
+      ],
+      "fixed_parameters": {
+        "beta": 0.6
+      },
+      "varying_parameters": {
+        "alpha": [
+          0.95,
+          0.97,
+          1.0
+        ]
+      },
+      "parameter_values": {
+        "alpha": [
+          0.95,
+          0.97,
+          1.0
+        ],
+        "beta": 0.6
+      },
+      "time_range": null,
+      "solver": null,
+      "inset_zoom": null,
+      "notes": [
+        "Caption extracted from page 9; review axis values and curves.",
+        "Values read from the figure description; initial conditions and step size remain unresolved."
+      ],
+      "confidence": "PARTIAL",
+      "reproducibility_status": "NEEDS_REVIEW"
+    },
+    {
+      "figure_id": "figure_04",
+      "source_document": "Papers\\333.pdf",
+      "caption": "Concentration of the tumor cells over time for different 𝛼and 𝛽= 0.6.",
+      "plot_type": "line",
+      "x_variable": null,
+      "y_variable": null,
+      "variables": [
+        "S",
+        "E",
+        "T",
+        "C"
+      ],
+      "fixed_parameters": {
+        "beta": 0.6
+      },
+      "varying_parameters": {
+        "alpha": [
+          0.95,
+          0.97,
+          1.0
+        ]
+      },
+      "parameter_values": {
+        "alpha": [
+          0.95,
+          0.97,
+          1.0
+        ],
+        "beta": 0.6
+      },
+      "time_range": null,
+      "solver": null,
+      "inset_zoom": null,
+      "notes": [
+        "Caption extracted from page 9; review axis values and curves.",
+        "Values read from the figure description; initial conditions and step size remain unresolved."
+      ],
+      "confidence": "PARTIAL",
+      "reproducibility_status": "NEEDS_REVIEW"
+    },
+    {
+      "figure_id": "figure_06",
+      "source_document": "Papers\\333.pdf",
+      "caption": "Concentration of the steam cells over time for 𝛼= 0.95 and different 𝛽.",
+      "plot_type": "line",
+      "x_variable": null,
+      "y_variable": null,
+      "variables": [
+        "S",
+        "E",
+        "T",
+        "C"
+      ],
+      "fixed_parameters": {
+        "alpha": 0.95
+      },
+      "varying_parameters": {
+        "beta": [
+          0.6,
+          0.7,
+          0.8
+        ]
+      },
+      "parameter_values": {},
+      "time_range": null,
+      "solver": null,
+      "inset_zoom": null,
+      "notes": [
+        "Caption extracted from page 9; review axis values and curves."
+      ],
+      "confidence": "PARTIAL",
+      "reproducibility_status": "NEEDS_REVIEW"
+    },
+    {
+      "figure_id": "figure_02",
+      "source_document": "Papers\\333.pdf",
+      "caption": "Concentration of the steam cells over time for different 𝛼and 𝛽= 0.6.",
+      "plot_type": "line",
+      "x_variable": null,
+      "y_variable": null,
+      "variables": [
+        "S",
+        "E",
+        "T",
+        "C"
+      ],
+      "fixed_parameters": {
+        "beta": 0.6
+      },
+      "varying_parameters": {
+        "alpha": [
+          0.95,
+          0.97,
+          1.0
+        ]
+      },
+      "parameter_values": {
+        "alpha": [
+          0.95,
+          0.97,
+          1.0
+        ],
+        "beta": 0.6
+      },
+      "time_range": null,
+      "solver": null,
+      "inset_zoom": null,
+      "notes": [
+        "Caption extracted from page 9; review axis values and curves.",
+        "Values read from the figure description; initial conditions and step size remain unresolved."
+      ],
+      "confidence": "PARTIAL",
+      "reproducibility_status": "NEEDS_REVIEW"
+    },
+    {
+      "figure_id": "figure_07",
+      "source_document": "Papers\\333.pdf",
+      "caption": "Concentration of the effectors cells over time for 𝛼= 0.95 and different 𝛽. Computer Methods and Programs in Biomedicine 260 (2025) 108565 9",
+      "plot_type": "line",
+      "x_variable": null,
+      "y_variable": null,
+      "variables": [
+        "S",
+        "E",
+        "T",
+        "C",
+        "IN"
+      ],
+      "fixed_parameters": {
+        "alpha": 0.95
+      },
+      "varying_parameters": {
+        "beta": [
+          0.6,
+          0.7,
+          0.8
+        ]
+      },
+      "parameter_values": {},
+      "time_range": null,
+      "solver": null,
+      "inset_zoom": null,
+      "notes": [
+        "Caption extracted from page 9; review axis values and curves."
+      ],
+      "confidence": "PARTIAL",
+      "reproducibility_status": "NEEDS_REVIEW"
+    },
+    {
+      "figure_id": "figure_08",
+      "source_document": "Papers\\333.pdf",
+      "caption": "Concentration of the tumor cells over time for 𝛼= 0.95 and different 𝛽.",
+      "plot_type": "line",
+      "x_variable": null,
+      "y_variable": null,
+      "variables": [
+        "S",
+        "E",
+        "T",
+        "C"
+      ],
+      "fixed_parameters": {
+        "alpha": 0.95
+      },
+      "varying_parameters": {
+        "beta": [
+          0.6,
+          0.7,
+          0.8
+        ]
+      },
+      "parameter_values": {},
+      "time_range": null,
+      "solver": null,
+      "inset_zoom": null,
+      "notes": [
+        "Caption extracted from page 10; review axis values and curves."
+      ],
+      "confidence": "PARTIAL",
+      "reproducibility_status": "NEEDS_REVIEW"
+    },
+    {
+      "figure_id": "figure_12",
+      "source_document": "Papers\\333.pdf",
+      "caption": "Concentration of the tumor cells over time for different values of 𝑘𝑇.",
+      "plot_type": "line",
+      "x_variable": null,
+      "y_variable": null,
+      "variables": [
+        "S",
+        "E",
+        "T",
+        "C"
+      ],
+      "fixed_parameters": {},
+      "varying_parameters": {
+        "kT": []
+      },
+      "parameter_values": {},
+      "time_range": null,
+      "solver": null,
+      "inset_zoom": null,
+      "notes": [
+        "Caption extracted from page 10; review axis values and curves.",
+        "Parameter is varied, but the plotted values are not explicitly tabulated in the source."
+      ],
+      "confidence": "PARTIAL",
+      "reproducibility_status": "NEEDS_REVIEW"
+    },
+    {
+      "figure_id": "figure_05",
+      "source_document": "Papers\\333.pdf",
+      "caption": "Concentration of the chemotherapy drug over time for different 𝛼and 𝛽= 0.6.",
+      "plot_type": "line",
+      "x_variable": null,
+      "y_variable": null,
+      "variables": [
+        "E",
+        "T",
+        "C"
+      ],
+      "fixed_parameters": {
+        "beta": 0.6
+      },
+      "varying_parameters": {
+        "alpha": [
+          0.95,
+          0.97,
+          1.0
+        ]
+      },
+      "parameter_values": {
+        "alpha": [
+          0.95,
+          0.97,
+          1.0
+        ],
+        "beta": 0.6
+      },
+      "time_range": null,
+      "solver": null,
+      "inset_zoom": null,
+      "notes": [
+        "Caption extracted from page 9; review axis values and curves.",
+        "Values read from the figure description; initial conditions and step size remain unresolved."
+      ],
+      "confidence": "PARTIAL",
+      "reproducibility_status": "NEEDS_REVIEW"
+    },
+    {
+      "figure_id": "figure_09",
+      "source_document": "Papers\\333.pdf",
+      "caption": "Concentration of the chemotherapy drug over time for 𝛼= 0.95 and different 𝛽.",
+      "plot_type": "line",
+      "x_variable": null,
+      "y_variable": null,
+      "variables": [
+        "E",
+        "T",
+        "C"
+      ],
+      "fixed_parameters": {
+        "alpha": 0.95
+      },
+      "varying_parameters": {
+        "beta": [
+          0.6,
+          0.7,
+          0.8
+        ]
+      },
+      "parameter_values": {},
+      "time_range": null,
+      "solver": null,
+      "inset_zoom": null,
+      "notes": [
+        "Caption extracted from page 10; review axis values and curves."
+      ],
+      "confidence": "PARTIAL",
+      "reproducibility_status": "NEEDS_REVIEW"
+    },
+    {
+      "figure_id": "figure_10",
+      "source_document": "Papers\\333.pdf",
+      "caption": "Concentration of the steam cells over time for different values of 𝛿2.",
+      "plot_type": "line",
+      "x_variable": null,
+      "y_variable": null,
+      "variables": [
+        "S",
+        "E",
+        "T",
+        "C"
+      ],
+      "fixed_parameters": {},
+      "varying_parameters": {
+        "delta2": [
+          5.4,
+          6.4,
+          7.4
+        ]
+      },
+      "parameter_values": {},
+      "time_range": null,
+      "solver": null,
+      "inset_zoom": null,
+      "notes": [
+        "Caption extracted from page 10; review axis values and curves.",
+        "The source describes an increase from 5.4 to 7.4; intermediate values are not explicitly tabulated."
+      ],
+      "confidence": "PARTIAL",
+      "reproducibility_status": "NEEDS_REVIEW"
+    },
+    {
+      "figure_id": "figure_11",
+      "source_document": "Papers\\333.pdf",
+      "caption": "Concentration of the steam cells over time for different values of 𝑘𝑠.",
+      "plot_type": "line",
+      "x_variable": null,
+      "y_variable": null,
+      "variables": [
+        "S",
+        "E",
+        "T",
+        "C"
+      ],
+      "fixed_parameters": {},
+      "varying_parameters": {
+        "ks": []
+      },
+      "parameter_values": {},
+      "time_range": null,
+      "solver": null,
+      "inset_zoom": null,
+      "notes": [
+        "Caption extracted from page 10; review axis values and curves.",
+        "Parameter is varied, but the plotted values are not explicitly tabulated in the source."
+      ],
+      "confidence": "PARTIAL",
+      "reproducibility_status": "NEEDS_REVIEW"
+    }
+  ],
+  "uncertainties": [
+    "Automated PDF extraction is layout-sensitive; equation text and captions require human review."
+  ],
+  "assumptions": [],
+  "unresolved_information": [
+    "Paper 1 source does not clearly provide all simulation initial conditions and step-size details.",
+    "Paper 1 displayed recurrence has an index-at-zero ambiguity requiring review."
+  ]
+}

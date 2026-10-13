@@ -1,0 +1,5 @@
+source_document: papers/333.pdf
+status: BLOCKED
+notes:
+  - Paper does not clearly provide all simulation initial conditions or step-size details.
+  - The displayed recurrence has an index-at-zero ambiguity.

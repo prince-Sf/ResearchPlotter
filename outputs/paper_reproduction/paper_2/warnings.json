@@ -1,0 +1,4 @@
+[
+  "PARTIAL: Paper-specified controlled trajectories and exact PINN comparison cannot be reproduced because control equations and training hyperparameters are incomplete; user-configured runs remain exploratory.",
+  "PARTIAL: the source does not sufficiently specify NSFD update/denominator details; no NSFD execution is claimed."
+]

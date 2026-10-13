@@ -1,0 +1,313 @@
+[
+  {
+    "figure_id": "figure_01",
+    "source_document": "Papers\\fninf-20-1748481.pdf",
+    "caption": "shows how variations in key parameters inﬂuence the basic reproduction number R0, reﬂecting the system’s sensitivity.",
+    "plot_type": "unknown",
+    "x_variable": null,
+    "y_variable": null,
+    "variables": [
+      "S",
+      "E",
+      "T",
+      "C",
+      "IN"
+    ],
+    "fixed_parameters": {},
+    "varying_parameters": {},
+    "parameter_values": {},
+    "time_range": null,
+    "solver": null,
+    "inset_zoom": null,
+    "notes": [
+      "Caption extracted from page 7; review axis values and curves."
+    ],
+    "confidence": "PARTIAL",
+    "reproducibility_status": "NEEDS_REVIEW"
+  },
+  {
+    "figure_id": "figure_02",
+    "source_document": "Papers\\fninf-20-1748481.pdf",
+    "caption": ", the dynamics of the Alzheimer’s disease model compartments over 200 days are shown. The temporal evolution of functional neurons (FN), infected neurons (IN), amyloid beta (Aβ), tau protein (Tμ) and microglia (Mρ) are depicted. Frontiers in Neuroinformatics 11 frontiersin.org",
+    "plot_type": "line",
+    "x_variable": null,
+    "y_variable": null,
+    "variables": [
+      "S",
+      "E",
+      "T",
+      "C",
+      "FN",
+      "IN",
+      "Aβ",
+      "Tμ",
+      "Mρ"
+    ],
+    "fixed_parameters": {},
+    "varying_parameters": {},
+    "parameter_values": {},
+    "time_range": null,
+    "solver": null,
+    "inset_zoom": null,
+    "notes": [
+      "Caption extracted from page 11; review axis values and curves."
+    ],
+    "confidence": "PARTIAL",
+    "reproducibility_status": "NEEDS_REVIEW"
+  },
+  {
+    "figure_id": "figure_03",
+    "source_document": "Papers\\fninf-20-1748481.pdf",
+    "caption": "Time-dependent log-sensitivities of the Alzheimer model variables to ±10% perturbations in parameters. (a) Functional neurons (FN). (b) Infected neurons (IN). (c) Amyloid beta (Aβ). (d) Tau protein (Tm). (e) Microglia (Mρ). Frontiers in Neuroinformatics 13 frontiersin.org",
+    "plot_type": "unknown",
+    "x_variable": null,
+    "y_variable": null,
+    "variables": [
+      "S",
+      "E",
+      "T",
+      "C",
+      "FN",
+      "IN",
+      "Aβ",
+      "Mρ"
+    ],
+    "fixed_parameters": {},
+    "varying_parameters": {},
+    "parameter_values": {},
+    "time_range": null,
+    "solver": null,
+    "inset_zoom": null,
+    "notes": [
+      "Caption extracted from page 13; review axis values and curves."
+    ],
+    "confidence": "PARTIAL",
+    "reproducibility_status": "NEEDS_REVIEW"
+  },
+  {
+    "figure_id": "figure_04",
+    "source_document": "Papers\\fninf-20-1748481.pdf",
+    "caption": "Dynamics of FN (functional neurons) under ±10% parameter variation.",
+    "plot_type": "line",
+    "x_variable": null,
+    "y_variable": null,
+    "variables": [
+      "S",
+      "E",
+      "T",
+      "C",
+      "FN"
+    ],
+    "fixed_parameters": {},
+    "varying_parameters": {},
+    "parameter_values": {},
+    "time_range": null,
+    "solver": null,
+    "inset_zoom": null,
+    "notes": [
+      "Caption extracted from page 14; review axis values and curves."
+    ],
+    "confidence": "PARTIAL",
+    "reproducibility_status": "NEEDS_REVIEW"
+  },
+  {
+    "figure_id": "figure_05",
+    "source_document": "Papers\\fninf-20-1748481.pdf",
+    "caption": "Dynamics of IN (infected neurons) under ±10% parameter variation.",
+    "plot_type": "line",
+    "x_variable": null,
+    "y_variable": null,
+    "variables": [
+      "S",
+      "E",
+      "T",
+      "C",
+      "IN"
+    ],
+    "fixed_parameters": {},
+    "varying_parameters": {},
+    "parameter_values": {},
+    "time_range": null,
+    "solver": null,
+    "inset_zoom": null,
+    "notes": [
+      "Caption extracted from page 15; review axis values and curves."
+    ],
+    "confidence": "PARTIAL",
+    "reproducibility_status": "NEEDS_REVIEW"
+  },
+  {
+    "figure_id": "figure_07",
+    "source_document": "Papers\\fninf-20-1748481.pdf",
+    "caption": "Dynamics of Tμ (tau protein concentration) under ±10% parameter variation.",
+    "plot_type": "line",
+    "x_variable": null,
+    "y_variable": null,
+    "variables": [
+      "S",
+      "E",
+      "T",
+      "C",
+      "IN",
+      "Tμ"
+    ],
+    "fixed_parameters": {},
+    "varying_parameters": {},
+    "parameter_values": {},
+    "time_range": null,
+    "solver": null,
+    "inset_zoom": null,
+    "notes": [
+      "Caption extracted from page 16; review axis values and curves."
+    ],
+    "confidence": "PARTIAL",
+    "reproducibility_status": "NEEDS_REVIEW"
+  },
+  {
+    "figure_id": "figure_09",
+    "source_document": "Papers\\fninf-20-1748481.pdf",
+    "caption": "Dynamics of functional neurons (FN) for different fractional orders α.",
+    "plot_type": "line",
+    "x_variable": null,
+    "y_variable": null,
+    "variables": [
+      "S",
+      "E",
+      "T",
+      "C",
+      "FN"
+    ],
+    "fixed_parameters": {},
+    "varying_parameters": {
+      "alpha": [
+        0.7,
+        0.8,
+        0.9,
+        1.0
+      ]
+    },
+    "parameter_values": {},
+    "time_range": null,
+    "solver": null,
+    "inset_zoom": null,
+    "notes": [
+      "Caption extracted from page 17; review axis values and curves.",
+      "The surrounding text reports alpha={0.7,0.8,0.9,1.0}; displayed legends and scales should be reviewed."
+    ],
+    "confidence": "PARTIAL",
+    "reproducibility_status": "NEEDS_REVIEW"
+  },
+  {
+    "figure_id": "figure_11",
+    "source_document": "Papers\\fninf-20-1748481.pdf",
+    "caption": "Dynamics of amyloid beta (Aβ) for varying fractional orders α.",
+    "plot_type": "line",
+    "x_variable": null,
+    "y_variable": null,
+    "variables": [
+      "S",
+      "E",
+      "T",
+      "C",
+      "IN",
+      "Aβ"
+    ],
+    "fixed_parameters": {},
+    "varying_parameters": {
+      "alpha": [
+        0.7,
+        0.8,
+        0.9,
+        1.0
+      ]
+    },
+    "parameter_values": {},
+    "time_range": null,
+    "solver": null,
+    "inset_zoom": null,
+    "notes": [
+      "Caption extracted from page 17; review axis values and curves.",
+      "The surrounding text reports alpha={0.7,0.8,0.9,1.0}; displayed legends and scales should be reviewed."
+    ],
+    "confidence": "PARTIAL",
+    "reproducibility_status": "NEEDS_REVIEW"
+  },
+  {
+    "figure_id": "figure_14",
+    "source_document": "Papers\\fninf-20-1748481.pdf",
+    "caption": "Time evolution of the model state and control variables: age-structured susceptible population, ﬁrst infected class, second infected class, disease progression variable, treated compartment, population response variable, optimal control z1(t), and optimal control z2(t). Frontiers in Neuroinformatics 18 frontiersin.org",
+    "plot_type": "unknown",
+    "x_variable": null,
+    "y_variable": null,
+    "variables": [
+      "S",
+      "E",
+      "T",
+      "C",
+      "IN"
+    ],
+    "fixed_parameters": {},
+    "varying_parameters": {},
+    "parameter_values": {},
+    "time_range": null,
+    "solver": null,
+    "inset_zoom": null,
+    "notes": [
+      "Caption extracted from page 18; review axis values and curves."
+    ],
+    "confidence": "PARTIAL",
+    "reproducibility_status": "NEEDS_REVIEW"
+  },
+  {
+    "figure_id": "figure_16",
+    "source_document": "Papers\\fninf-20-1748481.pdf",
+    "caption": "Convergence behavior and robustness comparison of fractional-order and integer-order PINNs under increasing noise levels. TABLE 3 Final loss and training time statistics for baseline, integerorder PINN and fractional order PINN models. Model Final loss Training time (s) Mean Std Min Max Mean Std Baseline",
+    "plot_type": "unknown",
+    "x_variable": null,
+    "y_variable": null,
+    "variables": [
+      "S",
+      "E",
+      "T",
+      "C",
+      "IN"
+    ],
+    "fixed_parameters": {},
+    "varying_parameters": {},
+    "parameter_values": {},
+    "time_range": null,
+    "solver": null,
+    "inset_zoom": null,
+    "notes": [
+      "Caption extracted from page 20; review axis values and curves."
+    ],
+    "confidence": "PARTIAL",
+    "reproducibility_status": "NEEDS_REVIEW"
+  },
+  {
+    "figure_id": "figure_18",
+    "source_document": "Papers\\fninf-20-1748481.pdf",
+    "caption": "Frontiers in Neuroinformatics 20 frontiersin.org",
+    "plot_type": "unknown",
+    "x_variable": null,
+    "y_variable": null,
+    "variables": [
+      "S",
+      "E",
+      "T",
+      "C",
+      "IN"
+    ],
+    "fixed_parameters": {},
+    "varying_parameters": {},
+    "parameter_values": {},
+    "time_range": null,
+    "solver": null,
+    "inset_zoom": null,
+    "notes": [
+      "Caption extracted from page 20; review axis values and curves."
+    ],
+    "confidence": "PARTIAL",
+    "reproducibility_status": "NEEDS_REVIEW"
+  }
+]
