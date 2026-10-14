@@ -22,6 +22,21 @@ equations, NSFD update details, or PINN training hyperparameters. Provide
 overrides in `configs/paper_2.yaml` or another YAML file and tag their origin;
 unknown information stays `UNKNOWN` until explicitly resolved.
 
+The tracked Paper 2 baseline under `outputs/paper_reproduction/paper_2/` is a
+historical diagnostic, not a valid reference trajectory. Its configured
+explicit GL run used `dt=1` with the recorded model and produced a negative
+amyloid state on the first update, then non-finite values after 17 completed
+steps. At the initial state, the configured Aβ equation's right-hand side is
+`-9.53504e-6`; the explicit `h^0.9` update at `h=1` therefore
+produces `Aβ₁ = -8.53504e-6`, matching the saved CSV. This identifies an
+unstable coarse configured step for this explicit update, not an invalid
+scientific model or a validated paper time step. The source does not establish
+the step size or fully specify the main NSFD method, so the project does not
+substitute a guessed smaller step. The saved report correctly labels the run
+`INVALID`; it is retained as evidence of the failure, not as a generated
+published result. New runs with no explicit time/order/solver configuration
+are blocked rather than assigned hidden defaults.
+
 The Streamlit Figure Reproduction workspace displays extracted figure manifests
 before execution. Paper 1 users may enter missing initial conditions, a time
 step, and (for Figures 11/12) otherwise-unlisted sweep values; these are

@@ -40,6 +40,7 @@ class GrunwaldLetnikovSolver(FractionalSolver):
         values, weights = model.validate_parameters(parameters), grunwald_letnikov_weights(order, len(time_grid))
         started = perf_counter()
         completed_steps = 0
+        failure_index: int | None = None
         for index in range(1, len(time_grid)):
             # Caputo correction subtracts y(0), preserving the derivative of a constant as zero.
             history = weights[1 : index + 1] @ (states[index - 1 :: -1] - states[0])
@@ -47,13 +48,21 @@ class GrunwaldLetnikovSolver(FractionalSolver):
                 derivative = model.rhs(time_grid[index - 1], states[index - 1], values)
                 states[index] = states[0] - history + step**order * derivative
             if not np.isfinite(states[index]).all():
+                failure_index = index
                 states[index:] = np.nan
                 break
             completed_steps = index
+        warnings = ["Reference GL implementation uses an explicit update; refine the grid and assess convergence."]
+        if failure_index is not None:
+            warnings.append(
+                f"Explicit GL update produced a non-finite state at index {failure_index} "
+                f"(time {time_grid[failure_index]:g}); remaining trajectory values are NaN."
+            )
         return SimulationResult(time=time_grid, states=states, state_names=model.state_names, parameters=values,
                                 initial_conditions=dict(zip(model.state_names, states[0])), solver_name=self.name,
                                 runtime_seconds=perf_counter() - started,
                                 diagnostics={"fractional_order": order, "time_step": step, "number_of_steps": len(time_grid) - 1,
                                              "completed_steps": completed_steps, "state_dimension": len(model.state_names),
+                                             "failure_index": failure_index,
                                              "finite": bool(np.isfinite(states).all()), "history_complexity": "O(N^2)"},
-                                warnings=["Reference GL implementation uses an explicit update; refine the grid and assess convergence."])
+                                warnings=warnings)

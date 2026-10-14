@@ -169,6 +169,10 @@ def reproduce_paper(
     elif key == "paper_2":
         report["paper_notes"] = alzheimer_analysis_notes()
         config = paper2_config or (load_paper2_config(config_path) if config_path is not None else None)
+        report["warnings"] = [
+            "PARTIAL: Paper-specified controlled trajectories and exact PINN comparison cannot be reproduced because control equations and training hyperparameters are incomplete; user-configured runs remain exploratory.",
+            "PARTIAL: the source does not sufficiently specify NSFD update/denominator details; no NSFD execution is claimed.",
+        ]
         if config is not None:
             configuration_path = destination / "configuration.yaml"
             dump_yaml(config, configuration_path)
@@ -177,17 +181,104 @@ def reproduce_paper(
         selected_initial = (config.initial_conditions if config and config.initial_conditions else initial_conditions)
         selected_parameters = config.parameters if config else None
         config_model = config.model if config else {}
-        fractional_order = float((config_model.get("fractional_order") if config_model else None) or ((config.solver.options.get("fractional_order") if config and config.solver else None) or .9))
-        model_provenance = config.provenance.get("model") if config else None
-        model_metadata = {"configuration_provenance": model_provenance.value if model_provenance is not None else "SOURCE_PAPER"}
-        model = build_alzheimer_model(selected_initial, fractional_order=fractional_order, parameters=selected_parameters, metadata=model_metadata)
-        selected_end = time_end if time_end is not None else (config.time.end if config and config.time else 200)
-        selected_step = step if step is not None else (config.time.step if config and config.time else 1)
-        selected_start = config.time.start if config and config.time else 0
-        grid = uniform_time_grid(selected_start, selected_end, selected_step)
         solver_options = dict(config.solver.options) if config and config.solver else {}
+        raw_model_order = config_model.get("fractional_order")
+        raw_solver_order = solver_options.get("fractional_order")
+        parsed_orders: dict[str, float] = {}
+        invalid_order_details = []
+        for label, raw_value in (("model.fractional_order", raw_model_order), ("solver.options.fractional_order", raw_solver_order)):
+            if raw_value is None:
+                continue
+            try:
+                parsed_value = float(raw_value)
+            except (TypeError, ValueError):
+                invalid_order_details.append(f"{label} must be a finite number in (0, 1].")
+                continue
+            if not np.isfinite(parsed_value) or not 0 < parsed_value <= 1:
+                invalid_order_details.append(f"{label} must be a finite number in (0, 1].")
+                continue
+            parsed_orders[label] = parsed_value
+        order_value = parsed_orders.get("model.fractional_order", parsed_orders.get("solver.options.fractional_order"))
+        selected_end = time_end if time_end is not None else (config.time.end if config and config.time else None)
+        selected_step = step if step is not None else (config.time.step if config and config.time else None)
+        selected_start = config.time.start if config and config.time else 0.0
+        solver_type = config.solver.type.lower() if config and config.solver else None
+        model_order_value = parsed_orders.get("model.fractional_order")
+        solver_order_value = parsed_orders.get("solver.options.fractional_order")
+
+        provenance = dict(report.get("configuration_provenance", {
+            "model": "SOURCE_PAPER",
+            "parameters": "SOURCE_PAPER",
+            "initial_conditions": "SOURCE_PAPER",
+            "time": "UNKNOWN",
+            "solver": "UNKNOWN",
+            "fractional_order": "UNKNOWN",
+            "controls": "UNKNOWN",
+            "nsfd": "UNKNOWN",
+            "pinn": "UNKNOWN",
+        }))
+        if time_end is not None or step is not None:
+            provenance["time"] = "USER_PROVIDED"
+        report["configuration_provenance"] = provenance
+
+        missing_configuration = []
+        if selected_end is None:
+            missing_configuration.append("time.end")
+        if selected_step is None:
+            missing_configuration.append("time.step")
+        if order_value is None:
+            missing_configuration.append("fractional order")
+        if solver_type is None:
+            missing_configuration.append("solver type")
+        order_conflict = (
+            model_order_value is not None
+            and solver_order_value is not None
+            and not np.isclose(float(model_order_value), float(solver_order_value))
+        )
+        unsupported_solver = solver_type is not None and solver_type not in {
+            "grunwald_letnikov", "grunwald-letnikov", "gl"
+        }
+        if missing_configuration or unsupported_solver or order_conflict or invalid_order_details:
+            details = []
+            if missing_configuration:
+                details.append("Missing explicit configuration: " + ", ".join(missing_configuration) + ".")
+            if unsupported_solver:
+                details.append(
+                    f"Solver {solver_type!r} is not executable by the Paper 2 adapter; "
+                    "only the configured Grünwald-Letnikov comparison path is available, and NSFD remains unsupported."
+                )
+            if order_conflict:
+                details.append(
+                    "model.fractional_order conflicts with solver.options.fractional_order; "
+                    "use one consistent value before running."
+                )
+            details.extend(invalid_order_details)
+            details.append(
+                "No numerical simulation was run. The paper does not establish the omitted baseline grid/order settings; "
+                "supply reviewed values in a YAML configuration and retain their provenance."
+            )
+            report.update({
+                "status": "PARTIAL",
+                "simulation_status": "BLOCKED",
+                "unresolved_information": details,
+            })
+            report["warnings"].append("BLOCKED: Paper 2 numerical execution requires explicit time range, step, fractional order, and supported solver configuration.")
+            (destination / "reproduction_report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+            (destination / "warnings.json").write_text(json.dumps(report["warnings"], indent=2), encoding="utf-8")
+            return report
+
+        fractional_order = float(order_value)
+        model_provenance = config.provenance.get("model") if config else None
+        order_provenance = provenance.get("fractional_order", "UNKNOWN")
+        model_metadata = {
+            "configuration_provenance": model_provenance.value if model_provenance is not None else "UNKNOWN",
+            "fractional_order_provenance": order_provenance,
+        }
+        model = build_alzheimer_model(selected_initial, fractional_order=fractional_order, parameters=selected_parameters, metadata=model_metadata)
+        grid = uniform_time_grid(selected_start, selected_end, selected_step)
         solver_options.setdefault("fractional_order", fractional_order)
         result = GrunwaldLetnikovSolver().solve(model, None, selected_initial, grid, solver_options)
+        baseline_validation = validate_simulation(result, model, require_nonnegative=True)
         configuration_payload = {
             "source_document": str(source),
             "provenance": report.get("configuration_provenance", {"model": "SOURCE_PAPER", "parameters": "SOURCE_PAPER", "initial_conditions": "SOURCE_PAPER", "fractional_order": "SOURCE_PAPER"}),
@@ -229,34 +320,66 @@ def reproduce_paper(
                         controlled = GrunwaldLetnikovSolver().solve(controlled_model, None, selected_initial, grid, solver_options)
                         controlled_path = destination / "simulation_data" / "controlled.csv"
                         controlled.save_csv(str(controlled_path))
-                        report["experiments"].append({"name": "controlled_gl", "status": "UNVERIFIED", "simulation_data": str(controlled_path), "provenance": "USER_PROVIDED", "control_values": config.controls.values})
+                        controlled_validation = validate_simulation(controlled, controlled_model, require_nonnegative=True)
+                        controlled_status = "UNVERIFIED" if controlled_validation["status"] == "VALID" else "INVALID"
+                        report["experiments"].append({
+                            "name": "controlled_gl",
+                            "status": controlled_status,
+                            "simulation_data": str(controlled_path),
+                            "provenance": "USER_PROVIDED",
+                            "control_values": config.controls.values,
+                            "validation": controlled_validation,
+                            "diagnostics": controlled.diagnostics,
+                        })
+                        if controlled_status == "INVALID":
+                            report["warnings"].append("INVALID: the user-configured controlled GL trajectory failed numerical validation; its CSV is retained as a diagnostic, not a validated result.")
                 else:
                     report["warnings"].append("BLOCKED: controlled equations must define every state and be marked USER_PROVIDED before controlled simulation.")
             if config.nsfd.enabled:
                 report["warnings"].append("BLOCKED: an NSFD solver is not implemented; supplied NSFD settings were recorded but not executed.")
             if config.pinn.enabled:
-                pinn_report = run_pinn_export(model, result, config.pinn, destination / "pinn", mode=str(config_model.get("pinn_mode", "fractional")), fractional_order=fractional_order)
-                report["pinn"] = pinn_report
-                if pinn_report.get("status") == "BLOCKED":
-                    report["warnings"].extend(pinn_report.get("warnings", []))
+                if baseline_validation["status"] != "VALID":
+                    report["pinn"] = {
+                        "status": "BLOCKED",
+                        "warnings": ["The baseline trajectory failed finite/positivity validation; it cannot be used as PINN reference data."],
+                    }
+                    report["warnings"].append("BLOCKED: PINN training was not started because the configured Paper 2 baseline trajectory is numerically invalid.")
                 else:
-                    noise_report = run_pinn_noise_export(model, result, config.pinn, config.noise_levels, destination / "pinn_noise", mode=str(config_model.get("pinn_mode", "fractional")), fractional_order=fractional_order)
-                    report["pinn_noise"] = noise_report
-                    if noise_report.get("status") == "BLOCKED":
-                        report["warnings"].extend(noise_report.get("warnings", []))
+                    pinn_report = run_pinn_export(model, result, config.pinn, destination / "pinn", mode=str(config_model.get("pinn_mode", "fractional")), fractional_order=fractional_order)
+                    report["pinn"] = pinn_report
+                    if pinn_report.get("status") == "BLOCKED":
+                        report["warnings"].extend(pinn_report.get("warnings", []))
+                    else:
+                        noise_report = run_pinn_noise_export(model, result, config.pinn, config.noise_levels, destination / "pinn_noise", mode=str(config_model.get("pinn_mode", "fractional")), fractional_order=fractional_order)
+                        report["pinn_noise"] = noise_report
+                        if noise_report.get("status") == "BLOCKED":
+                            report["warnings"].extend(noise_report.get("warnings", []))
     else:
         report["warnings"] = ["No paper-specific adapter is registered for this document."]
         (destination / "reproduction_report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
         return report
     data_path = destination / "simulation_data" / "baseline.csv"; data_path.parent.mkdir(parents=True, exist_ok=True); result.save_csv(str(data_path))
     validation = validate_simulation(result, model, require_nonnegative=True)
-    report.update({"status": "PARTIAL" if report["warnings"] else "UNVERIFIED", "simulation_data": str(data_path), "solver": result.solver_name, "validation": validation, "parameters": result.parameters, "initial_conditions": result.initial_conditions, "time_grid": {"start": float(result.time[0]), "end": float(result.time[-1]), "step": float(result.time[1] - result.time[0])}, "diagnostics": result.diagnostics})
+    report.update({"status": "PARTIAL" if report["warnings"] else "UNVERIFIED", "simulation_status": validation["status"], "simulation_data": str(data_path), "solver": result.solver_name, "validation": validation, "parameters": result.parameters, "initial_conditions": result.initial_conditions, "time_grid": {"start": float(result.time[0]), "end": float(result.time[-1]), "step": float(result.time[1] - result.time[0])}, "diagnostics": result.diagnostics})
     if key == "paper_2":
-        baseline_figure = multi_line_plot(result.time, result.to_frame().drop(columns="time"), xlabel="time", ylabel="state", title="Paper 2 configured baseline · partial")
-        baseline_figure_paths = save_figure(baseline_figure, destination / "figures" / "partial_baseline.png", formats=["png", "svg", "pdf"])
-        baseline_metadata = {"workflow": "paper_reproduction", "source_document": str(source), "plot_type": "multi_line", "status": "PARTIAL", "solver": result.solver_name, "configuration": str(report.get("configuration_json") or report.get("configuration") or "default baseline"), "warning": "Partial configured baseline, not a selected published figure reproduction."}
-        (destination / "figures" / "partial_baseline.json").write_text(json.dumps(baseline_metadata, indent=2), encoding="utf-8")
-        report["baseline_figures"] = [str(path) for path in baseline_figure_paths]
+        if validation["status"] == "VALID":
+            baseline_figure = multi_line_plot(result.time, result.to_frame().drop(columns="time"), xlabel="time", ylabel="state", title="Paper 2 configured baseline · partial")
+            baseline_figure_paths = save_figure(baseline_figure, destination / "figures" / "partial_baseline.png", formats=["png", "svg", "pdf"])
+            baseline_metadata = {"workflow": "paper_reproduction", "source_document": str(source), "plot_type": "multi_line", "status": "PARTIAL", "simulation_status": validation["status"], "solver": result.solver_name, "configuration": str(report.get("configuration_json") or report.get("configuration") or "configured baseline"), "warning": "Partial configured baseline, not a selected published figure reproduction."}
+            (destination / "figures" / "partial_baseline.json").write_text(json.dumps(baseline_metadata, indent=2), encoding="utf-8")
+            report["baseline_figures"] = [str(path) for path in baseline_figure_paths]
+        else:
+            report["baseline_figures"] = []
+            report["warnings"].append("INVALID: the configured Paper 2 baseline failed numerical validation; no baseline figure was generated. The saved CSV is diagnostic data only.")
+            report["numerical_failure_diagnostics"] = {
+                "status": validation["status"],
+                "completed_steps": result.diagnostics.get("completed_steps"),
+                "number_of_steps": result.diagnostics.get("number_of_steps"),
+                "failure_index": result.diagnostics.get("failure_index"),
+                "time_step": result.diagnostics.get("time_step"),
+                "minimum_finite_state": validation.get("min_state"),
+                "interpretation": "The explicit GL configuration failed numerical validation. This does not establish failure of the scientific model and does not justify inferring a replacement step size.",
+            }
     (destination / "validation_data.json").write_text(json.dumps(validation, indent=2), encoding="utf-8")
     (destination / "warnings.json").write_text(json.dumps(report["warnings"], indent=2), encoding="utf-8")
     (destination / "reproduction_report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")

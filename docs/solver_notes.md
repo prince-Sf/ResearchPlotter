@@ -8,6 +8,14 @@ observed ratio as a theoretical convergence order. The GL reference is tested
 against the Caputo constant-forcing solution and should still be refined before
 long or stiff Paper 2 runs.
 
+The Paper 2 configured baseline uses an explicit Caputo-corrected
+Grünwald--Letnikov recurrence. Its saved `dt=1` diagnostic is numerically
+unstable for the configured fast amyloid-decay term: the first update is
+negative, and the run overflows after 17 completed steps. Do not treat that
+coarse-step output as a model result or infer a replacement step from it. The
+paper's main simulation is described as NSFD, whose denominator/update details
+remain insufficient; no NSFD solver is claimed.
+
 The fractional PINN residual uses a Caputo-corrected Grünwald--Letnikov history
 sum on an increasing uniform grid. The history tensor operations retain
 gradients to the network outputs; ordinary autograd is used only for

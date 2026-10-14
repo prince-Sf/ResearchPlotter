@@ -14,8 +14,10 @@ def project_root(start: str | Path | None = None) -> Path:
 
 
 def output_path(*parts: str, root: str | Path | None = None) -> Path:
-    destination = (Path(root) if root else project_root()) / "outputs"
-    destination = destination.joinpath(*parts)
+    base = ((Path(root) if root else project_root()) / "outputs").resolve()
+    destination = base.joinpath(*parts).resolve()
+    if destination != base and base not in destination.parents:
+        raise ValueError("Output path must remain inside the outputs directory")
     destination.parent.mkdir(parents=True, exist_ok=True)
     return destination
 

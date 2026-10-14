@@ -52,13 +52,17 @@ provenance:
   controls: UNKNOWN
   nsfd: UNKNOWN
   pinn: UNKNOWN
+  solver: ASSUMED
+  time: ASSUMED
 
 solver:
+  # Exploratory GL comparison path; the source's main NSFD settings are incomplete.
   type: grunwald_letnikov
   options:
     fractional_order: 0.9
 
 time:
+  # Project-selected demonstration settings, not a reported paper time grid.
   start: 0
   end: 200
   step: 1

@@ -33,5 +33,7 @@ without evidence.
 - Do not commit local uploads, generated results, credentials, or research PDFs
   unless both authorization and repository policy are clear.
 
-There is no project license selected yet. Until one is chosen, do not imply a
-license grant when redistributing this project.
+The original ResearchPlotter code is licensed under the MIT License; see
+[`LICENSE`](LICENSE). Do not imply that this license grants rights to
+third-party papers, figures, datasets, or other external material. Preserve
+their attribution and verify redistribution terms before including them.

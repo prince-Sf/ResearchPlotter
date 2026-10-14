@@ -64,6 +64,92 @@ def test_paper_2_analysis_detects_fractional_and_pinn(paper_2_pdf: Path):
     assert any("controlled" in item.lower() for item in analysis.unresolved_information)
 
 
+def test_paper2_without_explicit_numerical_configuration_is_blocked(tmp_path: Path, paper_2_pdf: Path):
+    report = reproduce_paper(paper_2_pdf, tmp_path)
+
+    assert report["status"] == "PARTIAL"
+    assert report["simulation_status"] == "BLOCKED"
+    assert any("time.end" in item and "time.step" in item and "solver type" in item for item in report["unresolved_information"])
+    assert not (tmp_path / "paper_2" / "simulation_data" / "baseline.csv").exists()
+
+
+def test_paper2_invalid_coarse_config_is_diagnostic_not_a_figure(tmp_path: Path, paper_2_pdf: Path):
+    config = Path(__file__).parents[1] / "configs" / "paper_2.yaml"
+    report = reproduce_paper(paper_2_pdf, tmp_path, config_path=config)
+
+    assert report["status"] == "PARTIAL"
+    assert report["simulation_status"] == "INVALID"
+    assert report["validation"]["status"] == "INVALID"
+    assert report["diagnostics"]["completed_steps"] == 17
+    assert report["numerical_failure_diagnostics"]["failure_index"] == 18
+    assert report["baseline_figures"] == []
+    assert not (tmp_path / "paper_2" / "figures" / "partial_baseline.png").exists()
+
+
+def test_paper2_conflicting_fractional_orders_are_blocked(tmp_path: Path, paper_2_pdf: Path):
+    config = tmp_path / "paper2_conflicting_order.yaml"
+    config.write_text(
+        """
+model:
+  fractional_order: 0.8
+solver:
+  type: grunwald_letnikov
+  options:
+    fractional_order: 0.9
+time:
+  start: 0
+  end: 0.2
+  step: 0.1
+""",
+        encoding="utf-8",
+    )
+
+    report = reproduce_paper(paper_2_pdf, tmp_path / "conflict", config_path=config)
+
+    assert report["simulation_status"] == "BLOCKED"
+    assert any("conflicts with solver.options.fractional_order" in item for item in report["unresolved_information"])
+
+
+def test_paper2_invalid_baseline_blocks_pinn_training(tmp_path: Path, paper_2_pdf: Path, monkeypatch):
+    config = tmp_path / "paper2_invalid_pinn.yaml"
+    config.write_text(
+        """
+model:
+  fractional_order: 0.9
+solver:
+  type: grunwald_letnikov
+  options:
+    fractional_order: 0.9
+time:
+  start: 0
+  end: 200
+  step: 1
+pinn:
+  enabled: true
+  hidden_layers: [2]
+  activation: tanh
+  optimizer: Adam
+  learning_rate: 0.001
+  epochs: 1
+  collocation_points: 3
+  data_points: 3
+  physics_loss_weight: 1.0
+  initial_condition_loss_weight: 1.0
+""",
+        encoding="utf-8",
+    )
+
+    def training_must_not_start(*_args, **_kwargs):
+        raise AssertionError("PINN training must not consume an invalid reference trajectory")
+
+    monkeypatch.setattr("research_plotter.pipelines.paper_reproduction.run_pinn_export", training_must_not_start)
+    report = reproduce_paper(paper_2_pdf, tmp_path / "invalid-pinn", config_path=config)
+
+    assert report["simulation_status"] == "INVALID"
+    assert report["pinn"]["status"] == "BLOCKED"
+    assert "pinn_noise" not in report
+
+
 def test_paper_configs_are_valid_and_keep_review_status():
     paper_1 = load_yaml("configs/paper_1.yaml")
     paper_2 = load_experiment("configs/paper_2.yaml")
@@ -129,6 +215,7 @@ time:
   end: 0.2
   step: 0.1
 solver:
+  type: grunwald_letnikov
   options:
     fractional_order: 0.8
 """,
