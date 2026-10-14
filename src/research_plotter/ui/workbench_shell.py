@@ -44,6 +44,20 @@ def render_theme_styles(st: Any) -> None:
             "accent": "#39E6BB", "accent_soft": "#12352F", "border": "#203443",
             "shadow": "0 12px 30px rgba(0,0,0,.20)", "input": "#0D1924",
             "sidebar_muted": "#99ABB8", "active": "rgba(57,230,187,.13)",
+            "button_primary_bg": "#39E6BB", "button_primary_text": "#08111B",
+            "button_primary_hover": "#62EED0", "button_primary_active": "#2CC7A2",
+            # Match the previous dark secondary surface and border; only make
+            # the states explicit so the light palette cannot leak into them.
+            "button_secondary_bg": "#131720", "button_secondary_text": "#F2F6FA",
+            "button_secondary_border": "#203443", "button_secondary_hover": "#131720",
+            "button_secondary_hover_text": "#39E6BB",
+            "button_secondary_active": "#203443", "button_disabled_bg": "#131720",
+            "button_disabled_text": "#91A3B2", "button_disabled_border": "#293C4A",
+            "focus": "#73DCC7",
+            "success_bg": "#143323", "success_text": "#B7F7CC", "success_border": "#29573C",
+            "warning_bg": "#382D18", "warning_text": "#FFE3A0", "warning_border": "#6A5422",
+            "error_bg": "#3A1D20", "error_text": "#FFC2BE", "error_border": "#73383B",
+            "info_bg": "#142A3B", "info_text": "#C2DDF5", "info_border": "#2A506D",
         }
         theme_name = "dark"
     else:
@@ -53,12 +67,27 @@ def render_theme_styles(st: Any) -> None:
             "accent": "#176C45", "accent_soft": "#DDF3E4", "border": "#E6E8E3",
             "shadow": "0 10px 26px rgba(29,48,38,.055)", "input": "#FFFFFF",
             "sidebar_muted": "#B2C0B7", "active": "rgba(96,147,83,.28)",
+            "button_primary_bg": "#176C45", "button_primary_text": "#FFFFFF",
+            "button_primary_hover": "#115838", "button_primary_active": "#0D4A2F",
+            "button_secondary_bg": "#FFFFFF", "button_secondary_text": "#17202C",
+            "button_secondary_border": "#CDD5CC", "button_secondary_hover": "#F0F5F0",
+            "button_secondary_hover_text": "#17202C",
+            "button_secondary_active": "#E4EEE5", "button_disabled_bg": "#EEF0EC",
+            "button_disabled_text": "#58635B", "button_disabled_border": "#D9DED8",
+            "focus": "#176C45",
+            "success_bg": "#E5F4E8", "success_text": "#14532D", "success_border": "#A6D6B0",
+            "warning_bg": "#FFF5DC", "warning_text": "#744B00", "warning_border": "#E9CE8D",
+            "error_bg": "#FDEBE9", "error_text": "#8B1E1A", "error_border": "#E5B4AE",
+            "info_bg": "#EAF2FB", "info_text": "#163D63", "info_border": "#B6CEE8",
         }
         theme_name = "light"
-    variables = ";".join(f"--rp-{name}:{value}" for name, value in palette.items())
+    # CSS references use kebab-case tokens. Normalize Python palette keys
+    # consistently so keys such as ``button_secondary_bg`` do not silently
+    # become unrelated underscore-named custom properties.
+    variables = ";".join(f"--rp-{name.replace('_', '-')}: {value}" for name, value in palette.items())
     st.markdown(
         f"""<style>
-        :root {{{variables};color-scheme:{theme_name};}}
+        :root {{{variables};--rp-native-header-height:3.75rem;color-scheme:{theme_name};}}
         html, body, .stApp, [data-testid="stAppViewContainer"] {{
             background:var(--rp-bg); color:var(--rp-text);
             font-family:Inter,"Segoe UI",system-ui,-apple-system,sans-serif;
@@ -66,12 +95,23 @@ def render_theme_styles(st: Any) -> None:
         [data-testid="stAppViewContainer"] > .main {{background:var(--rp-bg);}}
         [data-testid="stHeader"] {{background:var(--rp-bg); border-bottom:1px solid var(--rp-border);}}
         [data-testid="stToolbar"] {{right:1rem;}}
-        div.block-container {{max-width:1540px; padding-top:1.25rem; padding-bottom:3rem;}}
-        section[data-testid="stSidebar"] {{
+        /* Streamlit's native header is absolutely positioned. Reserve its height
+           in the document flow so the workbench controls cannot sit underneath it. */
+        div.block-container {{max-width:1540px; padding-top:var(--rp-native-header-height); padding-bottom:3rem;}}
+        section[data-testid="stSidebar"][aria-expanded="true"] {{
             background:var(--rp-sidebar); border-right:1px solid var(--rp-border);
             min-width:18.5rem !important; max-width:18.5rem !important;
         }}
+        /* Let Streamlit's native collapse state remove the sidebar's flex
+           reservation instead of translating a fixed-width panel offscreen. */
+        section[data-testid="stSidebar"][aria-expanded="false"] {{
+            width:0 !important; min-width:0 !important; max-width:0 !important;
+            flex:0 0 0 !important; overflow:hidden !important; border:0 !important;
+        }}
         section[data-testid="stSidebar"] > div {{background:var(--rp-sidebar);}}
+        section[data-testid="stSidebar"][aria-expanded="true"] [data-testid="stSidebarContent"] > [data-testid="stSidebarHeader"] {{
+            position:sticky; top:0; z-index:5; background:var(--rp-sidebar);
+        }}
         section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {{color:#EAF1EC;}}
         section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] {{color:var(--rp-sidebar-muted);}}
         section[data-testid="stSidebar"] [data-testid="stRadio"] label {{
@@ -83,9 +123,65 @@ def render_theme_styles(st: Any) -> None:
             background:var(--rp-active); border-color:color-mix(in srgb,var(--rp-accent) 35%,transparent);
             box-shadow:inset 3px 0 0 var(--rp-accent); color:#F4FFF8;
         }}
+        section[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:focus-visible),
+        .block-container [data-testid="stRadio"] label[data-testid="stRadioOption"]:has(input:focus-visible) {{
+            outline:2px solid var(--rp-focus); outline-offset:2px;
+        }}
+        section[data-testid="stSidebar"] [data-testid="stRadio"] label[data-testid="stRadioOption"]:has(input:checked) > div > div:first-child,
+        .block-container [data-testid="stRadio"] label[data-testid="stRadioOption"]:has(input:checked) > div > div:first-child {{
+            background-color:var(--rp-accent) !important;
+        }}
         [data-testid="stMarkdownContainer"] h1 {{color:var(--rp-text); letter-spacing:-.035em; font-weight:760;}}
         [data-testid="stMarkdownContainer"] h2,[data-testid="stMarkdownContainer"] h3 {{color:var(--rp-text); letter-spacing:-.02em;}}
         [data-testid="stCaptionContainer"], small {{color:var(--rp-muted);}}
+        /* Streamlit's own widget labels and radio choices can retain the
+           server theme's near-white color when this app switches to light mode. */
+        .block-container [data-testid="stWidgetLabel"],
+        .block-container [data-testid="stWidgetLabel"] *,
+        .block-container [data-testid="stRadio"] label[data-testid="stRadioOption"],
+        .block-container [data-testid="stRadio"] label[data-testid="stRadioOption"] *,
+        .block-container [data-testid="stCheckbox"] label,
+        .block-container [data-testid="stCheckbox"] label *,
+        .block-container [data-testid="stToggle"] label,
+        .block-container [data-testid="stToggle"] label * {{
+            color:var(--rp-text) !important;
+        }}
+        .block-container input[type="checkbox"], .block-container input[type="radio"] {{accent-color:var(--rp-accent);}}
+        .block-container [data-testid="stCheckbox"] label:has(input[role="switch"]) > div:first-of-type {{
+            background-color:var(--rp-elevated) !important; border:1px solid var(--rp-border) !important;
+        }}
+        .block-container [data-testid="stCheckbox"] label[data-selected="true"]:has(input[role="switch"]) > div:first-of-type {{
+            background-color:var(--rp-accent) !important; border-color:var(--rp-accent) !important;
+        }}
+        .block-container [data-testid="stCheckbox"] label:has(input[role="switch"]) > div:first-of-type > div:first-child {{
+            background-color:var(--rp-surface) !important;
+        }}
+        .block-container [data-testid="stFileUploaderDropzoneInstructions"],
+        .block-container [data-testid="stFileUploaderDropzoneInstructions"] *,
+        .block-container [data-testid="stFileUploaderDropzone"] {{
+            color:var(--rp-muted) !important;
+        }}
+        .block-container [data-testid="stTooltipIcon"],
+        .block-container [data-testid="stTooltipIcon"] * {{color:var(--rp-muted) !important;}}
+        [role="tooltip"] {{background:var(--rp-elevated); color:var(--rp-text); border:1px solid var(--rp-border);}}
+        .block-container [data-testid="stSlider"] {{color:var(--rp-text);}}
+        .block-container [data-testid="stSlider"] output,
+        .block-container [data-testid="stSlider"] [data-testid*="Value"] {{color:var(--rp-text) !important;}}
+        .block-container [data-testid="stTextInput"] input:disabled,
+        .block-container [data-testid="stNumberInput"] input:disabled,
+        .block-container [data-testid="stTextArea"] textarea:disabled {{
+            color:var(--rp-muted) !important; background:var(--rp-elevated);
+        }}
+        .block-container [data-testid="stWidgetLabel"]:has(+ :disabled),
+        .block-container [data-testid="stRadio"] label:has(input:disabled),
+        .block-container [data-testid="stCheckbox"] label:has(input:disabled) {{color:var(--rp-muted) !important;}}
+        .block-container input:focus-visible,
+        .block-container textarea:focus-visible,
+        .block-container [role="combobox"]:focus-visible,
+        .block-container [role="tab"]:focus-visible {{
+            outline:2px solid var(--rp-focus); outline-offset:2px;
+        }}
+        .block-container a {{color:var(--rp-accent);}}
         [data-testid="stVerticalBlockBorderWrapper"] {{
             background:var(--rp-surface); border-color:var(--rp-border) !important;
             border-radius:16px; box-shadow:var(--rp-shadow);
@@ -97,16 +193,120 @@ def render_theme_styles(st: Any) -> None:
         [data-testid="stTextArea"] textarea,[data-testid="stSelectbox"] [role="combobox"] {{
             color:var(--rp-text); background:var(--rp-input); border-color:var(--rp-border); border-radius:9px;
         }}
+        [data-testid="stTextInput"] input::placeholder,
+        [data-testid="stTextArea"] textarea::placeholder {{color:var(--rp-muted);opacity:1;}}
         [data-testid="stFileUploader"] section {{background:var(--rp-surface); border-color:var(--rp-border); border-radius:12px;}}
-        [data-testid="stExpander"] {{background:var(--rp-surface); border-color:var(--rp-border); border-radius:12px;}}
-        [data-testid="stTabs"] [role="tab"] {{color:var(--rp-muted);}}
-        [data-testid="stTabs"] [role="tab"][aria-selected="true"] {{color:var(--rp-accent);}}
+        [data-testid="stFileUploaderDropzone"] {{border:1px dashed var(--rp-border);}}
+        [data-testid="stExpander"] {{background:var(--rp-surface); border-color:var(--rp-border); border-radius:12px; color:var(--rp-text);}}
+        [data-testid="stExpander"] summary,[data-testid="stExpander"] summary * {{color:var(--rp-text);}}
+        [data-testid="stTabs"] [role="tab"],[data-testid="stTabs"] [role="tab"] * {{color:var(--rp-muted);}}
+        [data-testid="stTabs"] [role="tab"][aria-selected="true"],
+        [data-testid="stTabs"] [role="tab"][aria-selected="true"] * {{color:var(--rp-accent);}}
+        [data-baseweb="menu"],[role="listbox"] {{background:var(--rp-surface); color:var(--rp-text); border:1px solid var(--rp-border);}}
+        [data-baseweb="menu"] [role="option"],[role="listbox"] [role="option"] {{color:var(--rp-text);}}
+        [data-baseweb="menu"] [role="option"]:hover,[role="listbox"] [role="option"]:hover,
+        [data-baseweb="menu"] [role="option"][aria-selected="true"],[role="listbox"] [role="option"][aria-selected="true"] {{
+            color:var(--rp-text); background:var(--rp-accent-soft);
+        }}
+        [data-baseweb="tag"] {{background:var(--rp-accent-soft); color:var(--rp-text);}}
         [data-testid="stDataFrame"],[data-testid="stTable"] {{border:1px solid var(--rp-border); border-radius:10px; overflow:hidden;}}
-        [data-testid="stAlert"] {{border-radius:11px;}}
-        div.stButton > button {{border-radius:10px; border-color:var(--rp-border); min-height:2.55rem;}}
-        div.stButton > button[kind="primary"] {{background:var(--rp-accent); color:#fff; border-color:var(--rp-accent);}}
-        div.stButton > button:hover {{border-color:var(--rp-accent); color:var(--rp-accent);}}
-        div.stButton > button[kind="primary"]:hover {{background:color-mix(in srgb,var(--rp-accent) 84%,black); color:#fff;}}
+        [data-testid="stProgress"] [role="progressbar"] > div {{background-color:var(--rp-accent) !important;}}
+        [data-testid="stAlertContainer"] {{border:1px solid transparent; border-radius:11px;}}
+        [data-testid="stAlertContainer"]:has([data-testid="stAlertContentSuccess"]) {{background:var(--rp-success-bg) !important; border-color:var(--rp-success-border) !important;}}
+        [data-testid="stAlertContentSuccess"],[data-testid="stAlertContentSuccess"] * {{color:var(--rp-success-text) !important;}}
+        [data-testid="stAlertContainer"]:has([data-testid="stAlertContentWarning"]) {{background:var(--rp-warning-bg) !important; border-color:var(--rp-warning-border) !important;}}
+        [data-testid="stAlertContentWarning"],[data-testid="stAlertContentWarning"] * {{color:var(--rp-warning-text) !important;}}
+        [data-testid="stAlertContainer"]:has([data-testid="stAlertContentError"]) {{background:var(--rp-error-bg) !important; border-color:var(--rp-error-border) !important;}}
+        [data-testid="stAlertContentError"],[data-testid="stAlertContentError"] * {{color:var(--rp-error-text) !important;}}
+        [data-testid="stAlertContainer"]:has([data-testid="stAlertContentInfo"]) {{background:var(--rp-info-bg) !important; border-color:var(--rp-info-border) !important;}}
+        [data-testid="stAlertContentInfo"],[data-testid="stAlertContentInfo"] * {{color:var(--rp-info-text) !important;}}
+        div.stButton > button,
+        div.stDownloadButton > button,
+        div[data-testid="stFormSubmitButton"] button,
+        div[data-testid="stFileUploader"] button,
+        button[data-testid="stBaseButton-secondary"] {{
+            background-color:var(--rp-button-secondary-bg);
+            color:var(--rp-button-secondary-text);
+            border:1px solid var(--rp-button-secondary-border);
+            border-radius:10px; min-height:2.55rem;
+            transition:background-color .12s ease,border-color .12s ease,color .12s ease;
+        }}
+        div.stButton > button[kind="primary"],
+        div.stDownloadButton > button[kind="primary"],
+        div[data-testid="stFormSubmitButton"] button[kind="primary"],
+        button[data-testid="stBaseButton-primary"] {{
+            background-color:var(--rp-button-primary-bg);
+            color:var(--rp-button-primary-text);
+            border-color:var(--rp-button-primary-bg);
+        }}
+        div.stButton > button:not(:disabled):not([disabled]):hover,
+        div.stDownloadButton > button:not(:disabled):not([disabled]):hover,
+        div[data-testid="stFormSubmitButton"] button:not(:disabled):not([disabled]):hover,
+        div[data-testid="stFileUploader"] button:not(:disabled):not([disabled]):hover,
+        button[data-testid="stBaseButton-secondary"]:not(:disabled):not([disabled]):hover {{
+            background-color:var(--rp-button-secondary-hover);
+            color:var(--rp-button-secondary-hover-text);
+            border-color:var(--rp-accent);
+        }}
+        div.stButton > button[kind="primary"]:not(:disabled):not([disabled]):hover,
+        div.stDownloadButton > button[kind="primary"]:not(:disabled):not([disabled]):hover,
+        div[data-testid="stFormSubmitButton"] button[kind="primary"]:not(:disabled):not([disabled]):hover,
+        button[data-testid="stBaseButton-primary"]:not(:disabled):not([disabled]):hover {{
+            background-color:var(--rp-button-primary-hover);
+            color:var(--rp-button-primary-text);
+            border-color:var(--rp-button-primary-hover);
+        }}
+        div.stButton > button:not(:disabled):not([disabled]):active,
+        div.stDownloadButton > button:not(:disabled):not([disabled]):active,
+        div[data-testid="stFormSubmitButton"] button:not(:disabled):not([disabled]):active,
+        div[data-testid="stFileUploader"] button:not(:disabled):not([disabled]):active,
+        button[data-testid="stBaseButton-secondary"]:not(:disabled):not([disabled]):active {{
+            background-color:var(--rp-button-secondary-active);
+        }}
+        div.stButton > button[kind="primary"]:not(:disabled):not([disabled]):active,
+        div.stDownloadButton > button[kind="primary"]:not(:disabled):not([disabled]):active,
+        div[data-testid="stFormSubmitButton"] button[kind="primary"]:not(:disabled):not([disabled]):active,
+        button[data-testid="stBaseButton-primary"]:not(:disabled):not([disabled]):active {{
+            background-color:var(--rp-button-primary-active);
+            color:var(--rp-button-primary-text);
+        }}
+        div.stButton > button:disabled, div.stButton > button[disabled],
+        div.stDownloadButton > button:disabled, div.stDownloadButton > button[disabled],
+        div[data-testid="stFormSubmitButton"] button:disabled,
+        div[data-testid="stFileUploader"] button:disabled,
+        button[data-testid^="stBaseButton-"]:disabled {{
+            background-color:var(--rp-button-disabled-bg);
+            color:var(--rp-button-disabled-text);
+            border-color:var(--rp-button-disabled-border);
+            opacity:1;
+            cursor:not-allowed;
+        }}
+        div.stButton > button:focus-visible,
+        div.stDownloadButton > button:focus-visible,
+        div[data-testid="stFormSubmitButton"] button:focus-visible,
+        div[data-testid="stFileUploader"] button:focus-visible,
+        button[data-testid^="stBaseButton-"]:focus-visible {{
+            outline:3px solid var(--rp-focus);
+            outline-offset:2px;
+            box-shadow:0 0 0 2px var(--rp-bg);
+        }}
+        section[data-testid="stSidebar"][aria-expanded="true"] [data-testid="stSidebarCollapseButton"] button {{
+            color:#F2F6FA !important; background:transparent; border:1px solid rgba(242,246,250,.20);
+            border-radius:8px; min-height:2rem; min-width:2rem;
+        }}
+        section[data-testid="stSidebar"][aria-expanded="true"] [data-testid="stSidebarCollapseButton"],
+        section[data-testid="stSidebar"][aria-expanded="true"] [data-testid="stSidebarCollapseButton"] button,
+        button[data-testid="stExpandSidebarButton"] {{visibility:visible !important;}}
+        section[data-testid="stSidebar"][aria-expanded="true"] [data-testid="stSidebarCollapseButton"] button:hover {{background:rgba(255,255,255,.12);}}
+        button[data-testid="stExpandSidebarButton"] {{
+            color:var(--rp-text) !important; background:var(--rp-surface) !important;
+            border:1px solid var(--rp-border) !important; border-radius:8px; min-height:2rem; min-width:2rem;
+        }}
+        button[data-testid="stExpandSidebarButton"]:hover {{background:var(--rp-accent-soft) !important; border-color:var(--rp-accent) !important;}}
+        [data-testid="stSidebarCollapseButton"] button span,
+        [data-testid="stExpandSidebarButton"] span {{color:inherit !important;}}
+        [data-testid="stSidebarCollapseButton"] button:focus-visible,
+        button[data-testid="stExpandSidebarButton"]:focus-visible {{outline:3px solid var(--rp-focus); outline-offset:2px;}}
         .rp-brand {{display:flex;gap:.7rem;align-items:center;padding:.45rem .2rem 1.15rem;}}
         .rp-brand strong {{font-size:1.22rem;letter-spacing:-.035em;color:#F4F7F4;}}
         .rp-brand strong span {{color:var(--rp-accent);}}
@@ -115,7 +315,9 @@ def render_theme_styles(st: Any) -> None:
         .rp-sidebar-note {{margin-top:1rem;padding:.8rem;border:1px solid rgba(180,210,190,.17);border-radius:13px;background:rgba(255,255,255,.045);color:#F1F6F2;font-size:.84rem;}}
         .rp-sidebar-note small {{display:block;color:var(--rp-sidebar-muted);margin-top:.2rem;}}
         .rp-topline {{border-bottom:1px solid var(--rp-border);padding-bottom:.4rem;margin-bottom:1.1rem;}}
-        .rp-local-workspace {{color:var(--rp-muted);font-size:.82rem;text-align:right;padding-top:.72rem;white-space:nowrap;}}
+        .rp-top-status {{color:var(--rp-muted);font-size:.82rem;text-align:right;white-space:nowrap;line-height:1.3;}}
+        .rp-local-workspace {{color:var(--rp-muted);font-size:.76rem;text-align:right;padding-top:.12rem;white-space:nowrap;line-height:1.3;}}
+        .block-container div[data-testid="stHorizontalBlock"]:has(input[placeholder*="Search experiments"]) label:has(input[type="checkbox"]) {{white-space:nowrap;}}
         .rp-hero {{position:relative;overflow:hidden;min-height:130px;padding:1rem .4rem 1.1rem;}}
         .rp-hero .rp-hello {{color:var(--rp-muted);font-size:1rem;margin-bottom:.1rem;}}
         .rp-hero h1 {{font-size:clamp(2.25rem,4vw,3.35rem);margin:.1rem 0 .2rem;line-height:1.05;}}
@@ -131,12 +333,31 @@ def render_theme_styles(st: Any) -> None:
         .rp-card-accent-blue {{border-top:3px solid #3576D3;}}
         .rp-card-accent-amber {{border-top:3px solid #D88A23;}}
         .rp-card-accent-violet {{border-top:3px solid #7657C7;}}
-        .rp-status-ok {{color:#16A05C;font-weight:650;}}
-        .rp-status-warn {{color:#D88921;font-weight:650;}}
-        .rp-status-bad {{color:#D74747;font-weight:650;}}
+        .rp-status-ok {{color:var(--rp-success-text);font-weight:650;}}
+        .rp-status-warn {{color:var(--rp-warning-text);font-weight:650;}}
+        .rp-status-bad {{color:var(--rp-error-text);font-weight:650;}}
         .rp-quick-title {{font-weight:680;color:var(--rp-text);}}
         @media (max-width:900px) {{
-            section[data-testid="stSidebar"] {{min-width:15rem !important;max-width:15rem !important;}}
+            section[data-testid="stSidebar"][aria-expanded="true"] {{width:15rem !important; min-width:15rem !important;max-width:15rem !important;}}
+            section[data-testid="stSidebar"][aria-expanded="false"] {{width:0 !important; min-width:0 !important; max-width:0 !important;}}
+            .block-container div[data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] .rp-metric-icon) {{
+                display:grid !important; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem;
+            }}
+            .block-container div[data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] .rp-metric-icon) > [data-testid="stColumn"] {{
+                width:auto !important; max-width:none !important; min-width:0 !important;
+            }}
+            .block-container div[data-testid="stHorizontalBlock"]:has(input[placeholder*="Search experiments"]) {{
+                display:grid !important; grid-template-columns:minmax(0,1fr) max-content;
+                gap:.5rem .8rem; align-items:center;
+            }}
+            /* Streamlit exposes each column as stColumn (not column). Keep the
+               search full-width and give the theme/status controls a real second row. */
+            .block-container div[data-testid="stHorizontalBlock"]:has(input[placeholder*="Search experiments"]) > [data-testid="stColumn"] {{
+                width:auto !important; max-width:none !important; min-width:0 !important;
+            }}
+            .block-container div[data-testid="stHorizontalBlock"]:has(input[placeholder*="Search experiments"]) > [data-testid="stColumn"]:first-child {{grid-column:1 / -1;}}
+            .block-container div[data-testid="stHorizontalBlock"]:has(input[placeholder*="Search experiments"]) > [data-testid="stColumn"]:nth-child(2) {{grid-column:1; justify-self:start;}}
+            .block-container div[data-testid="stHorizontalBlock"]:has(input[placeholder*="Search experiments"]) > [data-testid="stColumn"]:nth-child(3) {{grid-column:2; justify-self:end;}}
             .rp-hero svg {{opacity:.3;width:44%;}}
         }}
         @media (max-width:650px) {{
@@ -263,7 +484,7 @@ def _attention_count(workbench: Path) -> int:
 
 def render_top_navigation(st: Any, *, root: Path, outputs: Path) -> None:
     """Render a functional local search, persistent theme toggle, and status."""
-    columns = st.columns([7.6, 1.25, 1.4, 1.7], vertical_alignment="center")
+    columns = st.columns([7.0, 2.7, 3.0], vertical_alignment="center")
     with columns[0]:
         query = st.text_input(
             "Search local workspace",
@@ -276,11 +497,13 @@ def render_top_navigation(st: Any, *, root: Path, outputs: Path) -> None:
     with columns[2]:
         attention_count = _attention_count(outputs / "reports" / "workbench")
         if attention_count:
-            st.caption(f"● {attention_count} need review")
+            status = f"● {attention_count} need review"
         else:
-            st.caption("● Workspace ready")
-    with columns[3]:
-        st.markdown('<div class="rp-local-workspace">Local workspace</div>', unsafe_allow_html=True)
+            status = "● Workspace ready"
+        st.markdown(
+            f'<div class="rp-top-status">{status}</div><div class="rp-local-workspace">Local workspace</div>',
+            unsafe_allow_html=True,
+        )
     st.markdown('<div class="rp-topline"></div>', unsafe_allow_html=True)
 
     if not query:

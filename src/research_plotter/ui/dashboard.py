@@ -124,9 +124,9 @@ def render_dashboard(st: Any, *, root: Path, outputs: Path, workbench: Path) -> 
 
     lower = st.columns([1.55, 1.0], gap="medium")
     with lower[0].container(border=True):
-        header = st.columns([4, 1], vertical_alignment="center")
+        header = st.columns([3.4, 1.2], vertical_alignment="center")
         header[0].markdown("### ◷ Recent experiments")
-        header[1].button("View all →", on_click=_navigate, args=("Experiment History",), key="dashboard_view_history")
+        header[1].button("View all", on_click=_navigate, args=("Experiment History",), key="dashboard_view_history", use_container_width=True)
         st.caption("Latest local workbench runs. Completion status is separate from scientific reproducibility status.")
         if not records:
             st.info("No workbench runs yet. Try Dataset Analyzer with the bundled measurements example.")
@@ -156,15 +156,16 @@ def render_dashboard(st: Any, *, root: Path, outputs: Path, workbench: Path) -> 
         st.markdown("### ⚡ Quick Start")
         st.caption("Open an existing workflow to get started.")
         shortcuts = (
-            ("ƒx　Plot an Equation", "Equation / Formula Plotter", "Visualize a safe mathematical expression"),
-            ("▤　Analyze a Dataset", "Dataset Analyzer", "Explore and plot scientific data"),
-            ("▧　Reproduce a Figure", "Figure Reproduction", "Review evidence and run supported cases"),
-            ("◇　Simulate a Model", "Model Simulation", "Configure and run a model"),
+            ("ƒx　Plot", "Equation / Formula Plotter", "Visualize a safe mathematical expression"),
+            ("▤　Analyze", "Dataset Analyzer", "Explore and plot scientific data"),
+            ("▧　Reproduce", "Figure Reproduction", "Review evidence and run supported cases"),
+            ("◇　Simulate", "Model Simulation", "Configure and run a model"),
         )
         for index in range(0, len(shortcuts), 2):
             pair = st.columns(2, gap="small")
             for column, (label, page, detail) in zip(pair, shortcuts[index:index + 2]):
                 with column:
-                    st.button(f"{label}\n{detail}", on_click=_navigate, args=(page,), key=f"dashboard_quick_{index}_{page}", use_container_width=True)
+                    st.button(label, on_click=_navigate, args=(page,), key=f"dashboard_quick_{index}_{page}", use_container_width=True)
+                    st.caption(detail)
         st.caption("Empirical graph fits are candidates, not evidence that a paper used the same equation.")
 

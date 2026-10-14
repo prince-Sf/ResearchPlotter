@@ -87,6 +87,26 @@ def test_workbench_navigation_and_bundled_dataset_flow():
     assert not app.error, [item.value for item in app.error]
 
 
+def test_dashboard_quick_start_actions_keep_short_labels_and_destinations():
+    app = AppTest.from_file(str(APP_PATH), default_timeout=60).run()
+    assert not app.exception
+
+    actions = (
+        ("dashboard_quick_0_Equation / Formula Plotter", "ƒx　Plot", "Equation / Formula Plotter"),
+        ("dashboard_quick_0_Dataset Analyzer", "▤　Analyze", "Dataset Analyzer"),
+        ("dashboard_quick_2_Figure Reproduction", "▧　Reproduce", "Figure Reproduction"),
+        ("dashboard_quick_2_Model Simulation", "◇　Simulate", "Model Simulation"),
+    )
+    for key, label, destination in actions:
+        button = next(item for item in app.button if item.key == key)
+        assert button.label == label
+        button.click().run()
+        assert not app.exception
+        assert app.session_state["main_navigation"] == destination
+        app.session_state["main_navigation"] = "Dashboard"
+        app.run()
+
+
 def test_graph_image_digitized_data_handoff_does_not_require_a_fit(tmp_path):
     image = Image.new("RGB", (240, 160), "white")
     ImageDraw.Draw(image).line((10, 145, 230, 15), fill=(214, 39, 40), width=3)
