@@ -66,8 +66,11 @@ def _save_configuration(path: Path, payload: Any) -> Path:
 def _new_run_dir(workflow: str) -> tuple[str, Path]:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     run_id = f"{workflow}-{stamp}-{uuid4().hex[:8]}"
-    destination = WORKBENCH / workflow / run_id
-    destination.mkdir(parents=True, exist_ok=True)
+    from research_plotter.utils.paths import output_path
+
+    destination = output_path("reports", "workbench", workflow, run_id, root=ROOT)
+    destination.mkdir(parents=True, exist_ok=False)
+    destination = output_path("reports", "workbench", workflow, run_id, root=ROOT)
     return run_id, destination
 
 

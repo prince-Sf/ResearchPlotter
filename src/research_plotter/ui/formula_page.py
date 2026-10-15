@@ -29,22 +29,20 @@ from research_plotter.paper_analysis.equation_extractor import (
 )
 
 
-def _extract_uploaded_text(upload: Any, output_root: Path) -> tuple[str, list[str] | None]:
+def _extract_uploaded_text(upload: Any, output_root: Path) -> tuple[str, list[str] | None, Path]:
     suffix = Path(upload.name).suffix.lower()
     data = bytes(upload.getbuffer())
-    digest = hashlib.sha256(data).hexdigest()
     if suffix not in {".txt", ".pdf"}:
         raise ValueError("Formula input supports TXT or PDF files")
-    destination = output_root / "uploaded" / "formulas" / f"{digest[:16]}{suffix}"
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    if not destination.exists():
-        destination.write_bytes(data)
+    from research_plotter.utils.paths import persist_uploaded_file
+
+    destination = persist_uploaded_file(upload, "formulas", output_root=output_root)
     if suffix == ".txt":
         try:
-            return data.decode("utf-8-sig"), None
+            return data.decode("utf-8-sig"), None, destination
         except UnicodeDecodeError as error:
             raise ValueError("TXT input must be UTF-8 encoded; save the file as UTF-8 and upload again") from error
-    return "", extract_pdf_pages(destination)
+    return "", extract_pdf_pages(destination), destination
 
 
 def _format_assignments(values: dict[str, float]) -> str:
@@ -120,7 +118,7 @@ def render_formula_page(
             st.info("Upload a .txt or .pdf file. You can edit the extracted text before analysis or execution.")
             return
         try:
-            extracted_text, pages = _extract_uploaded_text(upload, output_root)
+            extracted_text, pages, uploaded_path = _extract_uploaded_text(upload, output_root)
         except Exception as error:
             st.error(f"Could not read the formula input.\n\nReason: {error}\n\nTry saving the file as UTF-8 text or uploading a text-based PDF.")
             return
@@ -147,7 +145,7 @@ def render_formula_page(
             if not pages:
                 st.warning("No PDF pages could be extracted.")
                 return
-            pdf_path = output_root / "uploaded" / "formulas" / f"{digest[:16]}.pdf"
+            pdf_path = uploaded_path
             source_document = str(pdf_path)
             try:
                 layouts = extract_pdf_layout(pdf_path)

@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import numpy as np
-import pytest
+import torch
 
 from research_plotter.config import PINNConfig, Provenance
 
@@ -36,7 +36,6 @@ def test_pinn_config_reports_missing_required_values():
 
 
 def test_pinn_forward_and_fractional_residual_shape():
-    torch = pytest.importorskip("torch", reason="PyTorch is not installed in this runtime; PINN runtime tests remain available after installing torch.")
     from research_plotter.pinn import StateNetwork, gl_fractional_derivative
 
     network = StateNetwork(output_dim=5, hidden_layers=(8,), activation="tanh")
@@ -49,7 +48,6 @@ def test_pinn_forward_and_fractional_residual_shape():
 
 
 def test_gl_fractional_residual_uses_history_and_keeps_parameter_gradients():
-    torch = pytest.importorskip("torch", reason="PyTorch is not installed in this runtime; fractional residual test requires torch.")
     from research_plotter.pinn import gl_fractional_derivative
 
     time = torch.linspace(0, 1, 9)
@@ -67,7 +65,6 @@ def test_gl_fractional_residual_uses_history_and_keeps_parameter_gradients():
 
 
 def test_torch_rhs_from_validated_model():
-    torch = pytest.importorskip("torch", reason="PyTorch is not installed in this runtime; Torch RHS tests remain available after installing torch.")
     from research_plotter.models import ModelSpec, Parameter, StateVariable
     from research_plotter.pinn import torch_rhs_from_model
 
@@ -86,7 +83,6 @@ def test_torch_rhs_from_validated_model():
 
 
 def test_tiny_baseline_integer_fractional_and_checkpoint(tmp_path: Path):
-    torch = pytest.importorskip("torch", reason="PyTorch is not installed in this runtime; PINN runtime tests remain available after installing torch.")
     from research_plotter.pinn import StateNetwork, run_pinn_experiment
 
     time = np.linspace(0, 1, 5)
@@ -120,7 +116,6 @@ def test_tiny_baseline_integer_fractional_and_checkpoint(tmp_path: Path):
 
 
 def test_tiny_noise_experiment_records_metrics():
-    torch = pytest.importorskip("torch", reason="PyTorch is not installed in this runtime; PINN noise tests remain available after installing torch.")
     from research_plotter.pinn import run_noise_experiments
 
     time = np.linspace(0, 1, 5)

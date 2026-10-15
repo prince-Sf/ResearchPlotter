@@ -3,7 +3,6 @@ from pathlib import Path
 import pytest
 from PIL import Image, ImageDraw
 
-streamlit = pytest.importorskip("streamlit")
 from streamlit.testing.v1 import AppTest
 
 from research_plotter.app import NAVIGATION

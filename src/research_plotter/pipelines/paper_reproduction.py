@@ -18,6 +18,7 @@ from research_plotter.paper_analysis.report_generator import save_analysis_repor
 from research_plotter.solvers.fractal_fractional import FractalFractionalGMLSolver
 from research_plotter.solvers.grunwald_letnikov import GrunwaldLetnikovSolver
 from research_plotter.utils.numerics import uniform_time_grid
+from research_plotter.utils.paths import contained_path, validate_contained_tree
 from research_plotter.plotting.core import save_figure
 from research_plotter.plotting.line import multi_line_plot
 from research_plotter.pipelines.pinn_experiment import run_pinn_export, run_pinn_noise_export
@@ -33,8 +34,8 @@ def _paper_key(path: str | Path) -> str:
 
 
 def analyze_paper(path: str | Path, output_root: str | Path = "outputs/paper_reproduction") -> Path:
+    destination = contained_path(output_root, _paper_key(path), "paper_analysis.json")
     analysis = parse_paper(path)
-    destination = Path(output_root) / _paper_key(path) / "paper_analysis.json"
     return save_analysis_report(analysis, destination)
 
 
@@ -49,8 +50,14 @@ def reproduce_paper(
     figure_id: str | None = None,
     figure_parameter_values: Mapping[str, list[float]] | None = None,
 ) -> dict[str, object]:
-    source = Path(path); key = _paper_key(source); destination = Path(output_root) / key; destination.mkdir(parents=True, exist_ok=True)
-    analysis_path = analyze_paper(source, output_root)
+    source = Path(path)
+    key = _paper_key(source)
+    selected_root = Path(output_root).expanduser().resolve()
+    destination = contained_path(selected_root, key)
+    destination.mkdir(parents=True, exist_ok=True)
+    destination = contained_path(selected_root, key)
+    validate_contained_tree(destination)
+    analysis_path = analyze_paper(source, selected_root)
     analysis = parse_paper(source)
     manifest_path = destination / "figure_manifests.json"
     manifest_path.write_text(json.dumps([item.model_dump(mode="json") for item in analysis.figures], indent=2, ensure_ascii=False), encoding="utf-8")

@@ -98,8 +98,10 @@ def test_formula_text_from_txt_file_and_pdf_extraction_smoke(tmp_path: Path, pap
         def getbuffer(self):
             return b"dy/dt = rate*y\ny(0)=1\nrate=0.2"
 
-    extracted, no_pages = _extract_uploaded_text(UploadedText(), tmp_path)
+    extracted, no_pages, stored_path = _extract_uploaded_text(UploadedText(), tmp_path)
     assert no_pages is None
+    assert stored_path.is_file()
+    assert stored_path.is_relative_to(tmp_path.resolve())
     assert "dy/dt" in extracted
     uploaded_spec = parse_equation_text(extracted)
     assert uploaded_spec.kind == "ode"

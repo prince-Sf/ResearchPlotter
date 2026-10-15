@@ -1,8 +1,10 @@
 from pathlib import Path
 
+import pytest
+
 from research_plotter.config import load_yaml, load_experiment, load_paper2_config
 from research_plotter.paper_analysis.paper_parser import parse_paper
-from research_plotter.pipelines.paper_reproduction import reproduce_paper
+from research_plotter.pipelines.paper_reproduction import analyze_paper, reproduce_paper
 
 
 def test_paper_1_analysis_preserves_uncertainty(tmp_path: Path, paper_1_pdf: Path):
@@ -13,6 +15,42 @@ def test_paper_1_analysis_preserves_uncertainty(tmp_path: Path, paper_1_pdf: Pat
     assert report["status"] == "BLOCKED"
     assert any("ks" in item and "kT" in item for item in report["warnings"])
     assert report["unresolved_experiments"]
+
+
+def test_paper_analysis_rejects_symlink_escape_from_selected_output_root(tmp_path: Path, paper_1_pdf: Path):
+    output_root = tmp_path / "reports"
+    output_root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    link = output_root / "paper_1"
+    try:
+        link.symlink_to(outside, target_is_directory=True)
+    except (OSError, NotImplementedError) as error:
+        pytest.skip(f"Directory symlinks are unavailable in this environment: {error}")
+
+    with pytest.raises(ValueError, match="inside the selected output directory"):
+        analyze_paper(paper_1_pdf, output_root)
+
+    assert list(outside.iterdir()) == []
+
+
+def test_paper_reproduction_rejects_nested_symlink_escape_before_writing(tmp_path: Path, paper_1_pdf: Path):
+    output_root = tmp_path / "reports"
+    paper_output = output_root / "paper_1"
+    paper_output.mkdir(parents=True)
+    outside = tmp_path / "outside.json"
+    outside.write_text("preserve", encoding="utf-8")
+    link = paper_output / "figure_manifests.json"
+    try:
+        link.symlink_to(outside)
+    except (OSError, NotImplementedError) as error:
+        pytest.skip(f"File symlinks are unavailable in this environment: {error}")
+
+    with pytest.raises(ValueError, match="inside the selected output directory"):
+        reproduce_paper(paper_1_pdf, output_root)
+
+    assert outside.read_text(encoding="utf-8") == "preserve"
+    assert not (paper_output / "paper_analysis.json").exists()
 
 
 def test_paper_1_selected_figure_runs_user_configured_exploratory_experiment(tmp_path: Path, paper_1_pdf: Path):
