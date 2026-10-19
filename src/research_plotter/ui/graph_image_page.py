@@ -12,6 +12,7 @@ import pandas as pd
 from PIL import ImageDraw
 
 from research_plotter.analysis.equation_fitting import CandidateFit, EquationFitResult, discover_equation_candidates, fit_equation
+from research_plotter.analysis.axis_calibration import AutomaticCalibrationResult, auto_calibrate_axes, validate_auto_calibration
 from research_plotter.analysis.graph_digitization import AxisCalibration, CurveColor, DigitizationResult, GraphImage, detect_curve_colors, digitize_color_curves, load_graph_image, render_pdf_page, validate_crop
 from research_plotter.ingestion.dataset_profiler import profile_dataset
 from research_plotter.models.formula_spec import parse_numeric_assignments
@@ -146,12 +147,112 @@ def _axis_calibration_controls(st: Any, image: GraphImage, crop: tuple[int, int,
     st.subheader("3 · Calibrate axes")
     st.caption(
         f"Image dimensions: {image.image.width} × {image.image.height} pixels. "
-        "Manual calibration is required: enter coordinates on the actual plotted axis lines, not the image boundaries. "
-        "The app does not infer tick values. For an inset, select it as its own crop and calibrate it separately."
+        "Pixel anchors refer to the original image and should match the actual plotted axis lines/ticks, not the image boundaries. "
+        "A selected crop is analyzed in its own region, while detected coordinates remain absolute-image pixels."
     )
+    identity_key = f"{prefix}_auto_calibration_identity"
+    result_key = f"{prefix}_auto_calibration_result"
+    validation_error_key = f"{prefix}_auto_calibration_validation_error"
+    identity = f"{image.source_sha256 or image.source_name}:{image.page_number}:{crop}"
+    recalculate = st.button("Auto-calibrate axes", key=f"{prefix}_auto_calibrate", help="Detect plot axes and locally read tick labels again. Detected values will replace the current calibration fields.")
+    source_changed = st.session_state.get(identity_key) != identity
+    if source_changed or recalculate:
+        try:
+            result = auto_calibrate_axes(image.image, crop)
+        except Exception as error:
+            # A detector failure is diagnostic state, not a reason to erase a
+            # previously entered manual mapping on an explicit retry.
+            result = AutomaticCalibrationResult(
+                values={
+                    "x_left_px": None, "x_right_px": None, "x_min": None, "x_max": None,
+                    "y_top_px": None, "y_bottom_px": None, "y_min": None, "y_max": None,
+                },
+                status="NEEDS_REVIEW", confidence="NONE", x_scale="linear", y_scale="linear",
+                plot_region=None, x_axis_pixel=None, y_axis_pixel=None, x_ticks=(), y_ticks=(),
+                ocr_available=False, warnings=(f"Automatic calibration raised an error: {error}",),
+            )
+            st.session_state[validation_error_key] = str(error)
+        else:
+            st.session_state.pop(validation_error_key, None)
+        st.session_state[result_key] = result
+        st.session_state[identity_key] = identity
+        candidate: AxisCalibration | None = None
+        try:
+            candidate = validate_auto_calibration(result, image.image.size, crop)
+        except ValueError as error:
+            st.session_state[validation_error_key] = str(error)
+        field_keys = {
+            "x_left_px": f"{prefix}_cal_x_left",
+            "x_right_px": f"{prefix}_cal_x_right",
+            "x_min": f"{prefix}_cal_x_min",
+            "x_max": f"{prefix}_cal_x_max",
+            "y_top_px": f"{prefix}_cal_y_top",
+            "y_bottom_px": f"{prefix}_cal_y_bottom",
+            "y_min": f"{prefix}_cal_y_min",
+            "y_max": f"{prefix}_cal_y_max",
+        }
+        if source_changed:
+            # A new image/crop must never inherit anchors from the previous
+            # source. A partial detector result may still prefill its usable
+            # axis, but cannot silently validate as a complete mapping.
+            for key in field_keys.values():
+                st.session_state.pop(key, None)
+            if candidate is not None or result.status == "PARTIAL":
+                for field, key in field_keys.items():
+                    detected = result.values[field]
+                    if detected is not None:
+                        st.session_state[key] = float(detected)
+                st.session_state[f"{prefix}_cal_x_scale"] = result.x_scale
+                st.session_state[f"{prefix}_cal_y_scale"] = result.y_scale
+        elif recalculate and candidate is not None:
+            # Apply a replacement atomically only after the complete proposed
+            # map passes the same validation used by digitization.
+            for field, key in field_keys.items():
+                st.session_state[key] = float(result.values[field])
+            st.session_state[f"{prefix}_cal_x_scale"] = result.x_scale
+            st.session_state[f"{prefix}_cal_y_scale"] = result.y_scale
+
+    result: AutomaticCalibrationResult | None = st.session_state.get(result_key)
+    if result is not None:
+        with st.expander("Review detected axes and tick labels", expanded=False):
+            review = image.image.crop(crop).copy()
+            draw = ImageDraw.Draw(review)
+            left, top, _, _ = crop
+            if result.x_axis_pixel is not None:
+                local_y = int(round(result.x_axis_pixel - top))
+                draw.line((0, local_y, review.width - 1, local_y), fill="#00a887", width=2)
+            if result.y_axis_pixel is not None:
+                local_x = int(round(result.y_axis_pixel - left))
+                draw.line((local_x, 0, local_x, review.height - 1), fill="#3984ff", width=2)
+            review_ticks = result.review_ticks or (*result.x_ticks, *result.y_ticks)
+            for tick in review_ticks:
+                if (tick.axis == "x" and result.x_axis_pixel is None) or (tick.axis == "y" and result.y_axis_pixel is None):
+                    continue
+                px = int(round(tick.pixel - left)) if tick.axis == "x" else int(round((result.y_axis_pixel or left) - left))
+                py = int(round((result.x_axis_pixel or top) - top)) if tick.axis == "x" else int(round(tick.pixel - top))
+                draw.ellipse((px - 4, py - 4, px + 4, py + 4), fill="#ff8c00", outline="white", width=1)
+                draw.text((max(0, px + 4), max(0, py - 13)), tick.label, fill="#ff8c00", stroke_width=2, stroke_fill="white")
+            st.image(review, caption="Visible detected axes are green/blue; orange points mark tick anchors. If axis strokes are unavailable, use the label/pixel table below. Coordinates are approximate.", use_container_width=True)
+            st.caption(f"Plot region estimate: {result.plot_region or 'not established'} · OCR: {'available locally' if result.ocr_available else 'unavailable or no readable tick labels'}")
+            if review_ticks:
+                st.dataframe(pd.DataFrame([
+                    {
+                        "Axis": tick.axis.upper(),
+                        "Original OCR label": tick.label,
+                        "Targeted OCR": tick.recognized_label,
+                        "Parsed value": tick.value,
+                        "Pixel": tick.pixel,
+                        "OCR confidence": tick.ocr_confidence,
+                        "Review status": tick.review_status,
+                        "Review note": tick.note,
+                    }
+                    for tick in review_ticks
+                ]), use_container_width=True, hide_index=True)
+            for warning in result.warnings:
+                st.caption(f"Review note: {warning}")
     x_cols = st.columns(4)
-    x_left = x_cols[0].number_input("X left pixel", min_value=0.0, max_value=float(image.image.width), value=None, step=1.0, help="Pixel coordinate of the left axis anchor, in the original image.", key=f"{prefix}_cal_x_left")
-    x_right = x_cols[1].number_input("X right pixel", min_value=0.0, max_value=float(image.image.width), value=None, step=1.0, help="Pixel coordinate of the right axis anchor, in the original image.", key=f"{prefix}_cal_x_right")
+    x_left = x_cols[0].number_input("X left pixel", min_value=0.0, max_value=float(image.image.width), value=None, step=1.0, help="Pixel coordinate of the left anchor in the original image (also for cropped inputs).", key=f"{prefix}_cal_x_left")
+    x_right = x_cols[1].number_input("X right pixel", min_value=0.0, max_value=float(image.image.width), value=None, step=1.0, help="Pixel coordinate of the right anchor in the original image.", key=f"{prefix}_cal_x_right")
     x_min = x_cols[2].number_input("X value at left", value=None, help="Data value printed at the selected left pixel anchor.", key=f"{prefix}_cal_x_min")
     x_max = x_cols[3].number_input("X value at right", value=None, help="Data value printed at the selected right pixel anchor.", key=f"{prefix}_cal_x_max")
     y_cols = st.columns(4)
@@ -164,7 +265,14 @@ def _axis_calibration_controls(st: Any, image: GraphImage, crop: tuple[int, int,
     y_scale = scales[1].selectbox("Y scale", ["linear", "log"], key=f"{prefix}_cal_y_scale")
     anchors = (x_left, x_right, x_min, x_max, y_top, y_bottom, y_min, y_max)
     if any(value is None for value in anchors):
-        st.info("Enter all eight pixel/data anchor values to configure the two-point axis mapping.")
+        if result is not None and result.status == "NEEDS_REVIEW":
+            st.warning("Automatic calibration could not determine a reliable mapping. Enter or correct the axis anchors manually.")
+        elif result is not None and result.status == "PARTIAL":
+            st.warning("Automatic calibration found only one usable axis. Complete the remaining anchors manually.")
+        if result is not None and not result.ocr_available:
+            st.info("Local OCR may prefill readable tick values when available. Enter the missing values manually or install the optional local OCR tools.")
+        else:
+            st.info("Enter or review all eight pixel/data anchors to configure the two-point axis mapping.")
         return None
     try:
         calibration = AxisCalibration(
@@ -173,8 +281,42 @@ def _axis_calibration_controls(st: Any, image: GraphImage, crop: tuple[int, int,
             x_scale=x_scale, y_scale=y_scale,
         )
         calibration.validate_image_bounds(image.image.size, crop)
-        st.caption("Configured mapping: left/right pixel anchors map to the supplied x values; top/bottom pixel anchors map to the supplied y values. Image y pixels increase downward.")
-        st.json(calibration.to_dict())
+        provenance = "USER_PROVIDED"
+        if result is not None:
+            expected = result.values
+            current = {
+                "x_left_px": float(x_left), "x_right_px": float(x_right), "x_min": float(x_min), "x_max": float(x_max),
+                "y_top_px": float(y_top), "y_bottom_px": float(y_bottom), "y_min": float(y_min), "y_max": float(y_max),
+            }
+            detected_fields = [key for key, value in expected.items() if value is not None]
+            same = bool(detected_fields) and all(np.isclose(current[key], float(expected[key]), rtol=1e-9, atol=1e-6) for key in detected_fields)
+            scales_same = x_scale == result.x_scale and y_scale == result.y_scale
+            if result.status == "DETECTED" and same and scales_same:
+                provenance = "AUTO_DETECTED"
+            elif detected_fields:
+                provenance = "USER_MODIFIED_AUTO_DETECTION" if same is False else "MIXED_AUTO_AND_USER_PROVIDED"
+        st.session_state[f"{prefix}_calibration_provenance"] = provenance
+        if result is not None and result.status != "DETECTED":
+            status = "unsuccessful" if result.status == "NEEDS_REVIEW" else "partial"
+            st.info(f"Automatic calibration was {status}. Your manual calibration is active.")
+            st.caption("The active mapping passed validation and will be used for extraction; the last automatic attempt remains available for review.")
+        elif result is not None and result.confidence == "HIGH" and provenance == "AUTO_DETECTED":
+            st.success("Axis calibration detected. Review the estimated values before extracting data.")
+        elif result is not None and provenance == "AUTO_DETECTED":
+            st.warning(f"Calibration is estimated ({result.confidence.lower()} confidence). Review the detected ticks and scale before extracting data.")
+        elif result is not None and provenance != "AUTO_DETECTED":
+            st.info("Automatic suggestions are editable. Your current manual corrections are active.")
+        if result is not None and result.warnings:
+            prefix_text = "Last automatic attempt: " if calibration is not None and result.status != "DETECTED" else ""
+            st.caption(f"{prefix_text}{result.warnings[0]}")
+        if st.session_state.get(validation_error_key):
+            st.warning(f"The automatic candidate was rejected during calibration validation: {st.session_state[validation_error_key]}")
+        if provenance == "AUTO_DETECTED":
+            st.caption("Using the detected mapping as currently shown. Values are estimates and remain editable; review before scientific use.")
+        elif provenance == "USER_PROVIDED":
+            st.caption("Using the mapping you entered. Image y pixels increase downward.")
+        else:
+            st.caption("Using your edited mapping. Manual changes take precedence over the automatic suggestions.")
         return calibration
     except ValueError as error:
         st.warning(f"Calibration needs review: {error}")
@@ -262,7 +404,7 @@ def _render_paper_comparison(st: Any, latest: dict[str, Any], new_run_dir, recor
                 "crop_coordinates_pixels": list(latest["crop"]),
                 "exclusion_regions_pixels": [list(region) for region in latest.get("exclusion_regions", ())],
                 "axis_calibration": latest["calibration"].to_dict(),
-                "axis_calibration_provenance": "USER_PROVIDED",
+                "axis_calibration_provenance": latest.get("calibration_provenance", "USER_PROVIDED"),
                 "curve_extraction_warnings": list(latest["result"].warnings),
                 "paper_figure_context": context,
                 "simulation_data": str(simulation_path),
@@ -375,7 +517,7 @@ def render_graph_image_page(
         named_colors = [(f"Curve {index + 1}", color.rgb) for index, color in enumerate(colors[:min(3, len(colors))])]
         tolerance = float(st.session_state.get(f"{prefix}_tolerance", 62))
         max_points = int(st.session_state.get(f"{prefix}_max_points", 2000))
-    st.caption("Calibration is manual unless you supply two pixel/value anchors per axis. Review the curve overlay and warnings before interpreting a fit.")
+    st.caption("Automatic axis/tick detection is an estimate. Review the calibration, curve overlay, and extraction warnings before interpreting a fit.")
     analyze_clicked = st.button("Analyze Graph and Find Equations", type="primary", disabled=calibration is None or not named_colors, key=f"{prefix}_analyze_graph")
     digitize_clicked = st.button("Extract digitized data", disabled=calibration is None or not named_colors, key=f"{prefix}_run_digitization")
     if (digitize_clicked or analyze_clicked) and calibration is not None and exclusion_regions is not None:
@@ -389,6 +531,8 @@ def render_graph_image_page(
                     extraction_settings={"colors": [{"name": name, "rgb": rgb} for name, rgb in named_colors], "color_tolerance": tolerance, "maximum_points_per_curve": max_points},
                     source_context=source_context,
                     exclusion_regions=exclusion_regions,
+                    calibration_provenance=st.session_state.get(f"{prefix}_calibration_provenance", "USER_PROVIDED"),
+                    calibration_detection=(st.session_state.get(f"{prefix}_auto_calibration_result").to_dict() if st.session_state.get(f"{prefix}_auto_calibration_result") else {}),
                 )
             record_run(run_id, run_dir, "graph-digitization", started, status="DIGITIZED", details={"source": source.source_name, "source_page": source.page_number, "point_count": len(result.data), "curve_count": len(result.curve_names), "metadata": str(artifacts["metadata"]), "warnings": result.warnings})
             candidates: list[CandidateFit] = []
@@ -420,6 +564,7 @@ def render_graph_image_page(
             st.session_state["latest_graph_analysis"] = {
                 "run_id": run_id, "run_dir": str(run_dir), "source": source, "source_context": source_context,
                 "result": result, "calibration": calibration, "crop": crop,
+                "calibration_provenance": st.session_state.get(f"{prefix}_calibration_provenance", "USER_PROVIDED"),
                 "extraction_settings": {"colors": [{"name": name, "rgb": rgb} for name, rgb in named_colors], "color_tolerance": tolerance, "maximum_points_per_curve": max_points},
                 "exclusion_regions": exclusion_regions,
                 "artifacts": {key: str(path) for key, path in artifacts.items()}, "fit": None,

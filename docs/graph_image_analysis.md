@@ -11,10 +11,30 @@ not proof of the equation or model used by the paper.
    unchanged; rendered previews and selected crops are separate artifacts.
 2. Crop to one main plotting region. Inset plots should be digitized as a
    separate region with their own calibration.
-3. Enter two pixel/data anchors on each axis. Pixel coordinates are in the
-   rendered image coordinate system, and image y increases downward. Linear
-   axes use affine mapping. Log axes interpolate in log10 space and require
-   positive calibration values. Tick detection is not treated as authoritative.
+3. Graph Image Analyzer attempts to detect the plot axes, tick marks, and
+   nearby tick labels. It uses local Tesseract OCR when available; no image is
+   sent to a network service. Tick-label alignment helps distinguish plot axes
+   from a decorative image border or gridline. If visible axis strokes do not
+   form an intersecting pair, aligned OCR label rows/columns can still provide
+   a candidate mapping, which is marked low confidence. The detected values
+   prefill the same editable eight calibration fields used by manual
+   calibration. Review the highlighted axis/tick preview and table before
+   digitizing. If OCR is unavailable or a label is ambiguous, affected fields
+   remain blank for manual entry. Pixel coordinates are in original rendered-
+   image coordinates even when a crop is selected, and image y increases
+   downward. Linear axes use affine mapping; log axes interpolate in log10
+   space and require positive calibration values. With only two ticks, linear
+   versus logarithmic scaling cannot be inferred from spacing alone and is
+   flagged for review. A logarithmic candidate must itself explain at least
+   three distinct tick positions; a two-point zero-residual log fit is not
+   sufficient evidence to override a multi-tick linear mapping.
+   Geometry detection combines long-line evidence, local contrast, and tick
+   text alignment; arrowhead strokes without nearby labels are suppressed near
+   axis endpoints. Small-figure OCR can confuse π with
+   similar glyphs or mistake a decimal point; context-supported π corrections
+   are warned and must be checked against the source. Manual cropping and
+   calibration remain available; curve shape is never used to invent axis
+   values.
 4. Review detected RGB candidates, choose and name curves, and adjust color
    tolerance. The reference implementation uses RGB distance segmentation
    and the median detected y pixel in each x column to reduce line-thickness
@@ -74,4 +94,27 @@ candidate was the original equation or mathematical model.
 To correct an extraction, adjust the plot crop, axis anchors, color choice, or
 tolerance and digitize again. For non-linear/log axes, verify both calibration
 anchors against visible ticks before interpreting results.
+
+## Optional local OCR setup
+
+Axis geometry detection works without OCR, but geometry alone does not provide
+the numerical tick values. For automatic label recognition, install the
+optional Python adapter and a local Tesseract executable:
+
+```powershell
+python -m pip install -e ".[ocr]"
+```
+
+Install Tesseract for the operating system using its normal package/installer
+distribution, then restart ResearchPlotter. On Windows, the adapter uses the
+executable on `PATH` or checks the standard Program Files installation
+location. It tries the nested `script/Greek` model when present, then falls
+back to English OCR; the nested script model may not appear in Python's
+language-list API even when Tesseract itself can use it. The application
+reports when the optional executable is unavailable and keeps all eight
+manual fields usable. No OCR service, uploaded figure, or paid API is used.
+OCR output is an estimate; fractional/Greek labels, scientific notation,
+superscripts, and crowded legends can still require manual correction. The
+detector reports low confidence when it relies on label alignment instead of
+visible axis strokes, and it does not infer a formula from curve shape.
 

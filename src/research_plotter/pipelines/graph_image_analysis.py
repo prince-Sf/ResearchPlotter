@@ -34,6 +34,8 @@ def save_digitization_artifacts(
     extraction_settings: dict[str, object] | None = None,
     source_context: dict[str, object] | None = None,
     exclusion_regions: tuple[tuple[int, int, int, int], ...] = (),
+    calibration_provenance: str = "USER_PROVIDED",
+    calibration_detection: dict[str, object] | None = None,
 ) -> dict[str, Path]:
     """Save long/wide CSV, reviewed crop, figures, and provenance metadata."""
     destination = Path(output_dir)
@@ -73,7 +75,8 @@ def save_digitization_artifacts(
         ],
         "exclusion_policy": "matching pixels are removed; gaps are preserved and are not interpolated",
         "axis_calibration": calibration.to_dict(),
-        "axis_calibration_provenance": "USER_PROVIDED",
+        "axis_calibration_provenance": calibration_provenance,
+        "axis_calibration_detection": calibration_detection or {},
         "extraction_method": result.extraction_method,
         "extraction_settings": extraction_settings or {},
         "curves": [{"name": name, "point_count": int((result.data["curve_name"] == name).sum())} for name in result.curve_names],
