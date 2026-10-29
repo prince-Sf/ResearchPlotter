@@ -77,7 +77,7 @@ def plot_pixel_overlay(
     with scientific_style(dpi, 10):
         figure, ax = plt.subplots(figsize=(7.2, 4.8))
         ax.imshow(crop_image.convert("RGB"), origin="upper")
-        ax.scatter(selected["pixel_x"] - left, selected["pixel_y"] - top, s=8, color="#d62728", label="Digitized median pixels")
+        ax.scatter(selected["pixel_x"] - left, selected["pixel_y"] - top, s=8, color="#d62728", label="Digitized pixels")
         if fit is not None:
             px, py = calibration.data_to_pixel(fit.x, fit.fitted_y)
             _plot_fit_segments(ax, selected.sort_values("x", kind="stable")["pixel_x"].to_numpy(dtype=float), px - left, py - top, color="#2ca02c", label="Fitted candidate mapped to pixels")
@@ -96,8 +96,9 @@ def _plot_fit_segments(ax, source_pixel_x, x_values, y_values, *, color=None, la
         raise ValueError("Fit predictions and digitized pixel coordinates must have matching lengths")
     if len(x_values) == 0:
         return
-    # The extractor keeps one observation per image column. A skipped column
-    # may be a crop boundary or an exclusion; never bridge a larger gap here.
+    # A skipped source-image column may be a crop boundary, mask, or exclusion;
+    # never bridge a larger gap here. Duplicate columns can be retained when
+    # the raster resolves distinct vertical trace clusters.
     segment_ids = np.r_[0, np.cumsum(np.abs(np.diff(source_pixel_x)) > 1.5)]
     first = True
     for segment_id in np.unique(segment_ids):

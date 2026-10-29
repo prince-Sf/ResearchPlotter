@@ -456,12 +456,12 @@ def render_graph_image_page(
 
     with st.expander("Advanced cropping and exclusion regions", expanded=False):
         st.subheader("2 · Select plot region")
-        st.caption("Crop to the actual plotting axes. Exclude legends or inset areas here; an inset should be analyzed separately with its own crop and calibration.")
+        st.caption("Select the actual plotting rectangle. This region controls which image pixels may be digitized; calibration tick anchors only define pixel-to-data mapping and may lie inside this region. Exclude legends or insets here, or analyze an inset separately with its own region and calibration.")
         crop_cols = st.columns(4)
-        crop_left = crop_cols[0].number_input("Crop left pixel", min_value=0, max_value=image.width - 1, value=0, key=f"{prefix}_crop_left")
-        crop_right = crop_cols[1].number_input("Crop right pixel", min_value=1, max_value=image.width, value=image.width, key=f"{prefix}_crop_right")
-        crop_top = crop_cols[2].number_input("Crop top pixel", min_value=0, max_value=image.height - 1, value=0, key=f"{prefix}_crop_top")
-        crop_bottom = crop_cols[3].number_input("Crop bottom pixel", min_value=1, max_value=image.height, value=image.height, key=f"{prefix}_crop_bottom")
+        crop_left = crop_cols[0].number_input("Plot region left pixel", min_value=0, max_value=image.width - 1, value=0, key=f"{prefix}_crop_left")
+        crop_right = crop_cols[1].number_input("Plot region right pixel", min_value=1, max_value=image.width, value=image.width, key=f"{prefix}_crop_right")
+        crop_top = crop_cols[2].number_input("Plot region top pixel", min_value=0, max_value=image.height - 1, value=0, key=f"{prefix}_crop_top")
+        crop_bottom = crop_cols[3].number_input("Plot region bottom pixel", min_value=1, max_value=image.height, value=image.height, key=f"{prefix}_crop_bottom")
         try:
             crop = validate_crop(image.size, (int(crop_left), int(crop_top), int(crop_right), int(crop_bottom)))
             crop_image = image.crop(crop)
@@ -484,10 +484,50 @@ def render_graph_image_page(
         crop = (0, 0, image.width, image.height)
         crop_image = image.copy()
         exclusion_regions = ()
-        st.caption("Current plot region uses the full image. Use Advanced cropping if labels, legend, or insets are present.")
+        st.caption("Current extraction plot region uses the full image. Set a tighter plot region if labels, legends, or insets overlap the curves.")
     calibration = _axis_calibration_controls(st, source, crop, prefix)
+    calibration_detection: AutomaticCalibrationResult | None = st.session_state.get(f"{prefix}_auto_calibration_result")
+    detected_plot_region = calibration_detection.plot_region if calibration_detection else None
+    if detected_plot_region is not None:
+        try:
+            detected_plot_region = validate_crop(image.size, detected_plot_region)
+            if not (crop[0] <= detected_plot_region[0] < detected_plot_region[2] <= crop[2]
+                    and crop[1] <= detected_plot_region[1] < detected_plot_region[3] <= crop[3]):
+                detected_plot_region = None
+        except ValueError:
+            detected_plot_region = None
+    use_detected_region = st.checkbox(
+        "Use detected plot-region estimate",
+        value=detected_plot_region is not None,
+        disabled=detected_plot_region is None,
+        help="Uses visible axis/frame geometry to limit extraction. Turn this off to use the manually selected plot rectangle above.",
+        key=f"{prefix}_use_detected_plot_region",
+    )
+    plot_region = detected_plot_region if use_detected_region and detected_plot_region is not None else crop
+    st.caption(f"Extraction region: x={plot_region[0]}–{plot_region[2] - 1}, y={plot_region[1]}–{plot_region[3] - 1}. Calibration anchors only map pixels to values and do not set these bounds.")
+    if detected_plot_region is not None and use_detected_region:
+        with st.expander("Review selected extraction region", expanded=False):
+            st.image(image.crop(plot_region), caption="Detected plotting region used for curve extraction", use_container_width=True)
+    if calibration is not None:
+        try:
+            calibration.validate_image_bounds(image.size, plot_region)
+        except ValueError as error:
+            st.error(f"Axis anchors do not lie within the selected plot region: {error}. Correct the plot region or calibration before digitizing.")
+            calibration = None
+    axis_pixels = (
+        (calibration_detection.x_axis_pixel, calibration_detection.y_axis_pixel)
+        if calibration_detection is not None
+        and calibration_detection.x_axis_pixel is not None
+        and calibration_detection.y_axis_pixel is not None
+        else None
+    )
     st.subheader("4 · Choose curves and analyze")
-    colors = detect_curve_colors(image, crop, exclusion_regions=exclusion_regions or ())
+    region_exclusions = tuple(
+        (max(a, plot_region[0]), max(b, plot_region[1]), min(c, plot_region[2]), min(d, plot_region[3]))
+        for a, b, c, d in (exclusion_regions or ())
+        if max(a, plot_region[0]) < min(c, plot_region[2]) and max(b, plot_region[1]) < min(d, plot_region[3])
+    )
+    colors = detect_curve_colors(image, plot_region, exclusion_regions=region_exclusions)
     if not colors:
         st.warning("No likely line colors were detected. Tighten the crop or choose a more colorful/high-contrast source image.")
         return
@@ -525,10 +565,14 @@ def render_graph_image_page(
         started = time.perf_counter()
         try:
             with st.spinner("Segmenting curve pixels and applying axis calibration…"):
-                result = digitize_color_curves(image, crop=crop, calibration=calibration, colors=named_colors, color_tolerance=float(tolerance), max_points=int(max_points), exclusion_regions=exclusion_regions)
+                result = digitize_color_curves(
+                    image, crop=crop, plot_region=plot_region, calibration=calibration, colors=named_colors,
+                    color_tolerance=float(tolerance), max_points=int(max_points),
+                    exclusion_regions=exclusion_regions, axis_pixels=axis_pixels,
+                )
                 artifacts = save_digitization_artifacts(
-                    source, result, calibration=calibration, crop=crop, output_dir=run_dir, experiment_id=run_id,
-                    extraction_settings={"colors": [{"name": name, "rgb": rgb} for name, rgb in named_colors], "color_tolerance": tolerance, "maximum_points_per_curve": max_points},
+                    source, result, calibration=calibration, crop=crop, plot_region=plot_region, output_dir=run_dir, experiment_id=run_id,
+                    extraction_settings={"plot_region_pixels": list(plot_region), "colors": [{"name": name, "rgb": rgb} for name, rgb in named_colors], "color_tolerance": tolerance, "maximum_points_per_curve": max_points, "detected_axis_pixels": axis_pixels, "axis_mask_half_width_px": 2},
                     source_context=source_context,
                     exclusion_regions=exclusion_regions,
                     calibration_provenance=st.session_state.get(f"{prefix}_calibration_provenance", "USER_PROVIDED"),
@@ -536,48 +580,61 @@ def render_graph_image_page(
                 )
             record_run(run_id, run_dir, "graph-digitization", started, status="DIGITIZED", details={"source": source.source_name, "source_page": source.page_number, "point_count": len(result.data), "curve_count": len(result.curve_names), "metadata": str(artifacts["metadata"]), "warnings": result.warnings})
             candidates: list[CandidateFit] = []
+            candidates_by_curve: dict[str, list[CandidateFit]] = {}
+            candidate_errors: dict[str, str] = {}
             discovery_report: str | None = None
             if analyze_clicked:
                 preferred_curve = named_colors[0][0]
                 discovery_id, discovery_dir = new_run_dir("graph-equation-discovery")
                 discovery_started = time.perf_counter()
+                for curve, _ in named_colors:
+                    try:
+                        with st.spinner(f"Ranking equation candidates for {curve}…"):
+                            selected_points = result.data[result.data["curve_name"] == curve]
+                            candidates_by_curve[curve] = discover_equation_candidates(selected_points, max_candidates=5)
+                    except Exception as curve_error:
+                        candidate_errors[curve] = str(curve_error)
+                        st.warning(f"Digitization completed, but candidate discovery for {curve} needs review: {curve_error}")
+                candidates = candidates_by_curve.get(preferred_curve, [])
                 try:
-                    with st.spinner(f"Ranking equation candidates for {preferred_curve}…"):
-                        selected_points = result.data[result.data["curve_name"] == preferred_curve]
-                        candidates = discover_equation_candidates(selected_points, max_candidates=5)
-                        discovery_payload = {
-                            "status": "CANDIDATE",
-                            "evidence_status": "EMPIRICAL_FIT",
-                            "digitization_run": run_id,
-                            "curve": preferred_curve,
-                            "validation_policy": "Every fifth x-sorted training observation was held out; training-only initial guesses; ranked by held-out RMSE, then full-fit BIC and parameter count.",
-                            "interpretation": "Candidate equations approximate digitized points; they are not evidence of the original source equation.",
-                            "candidates": [candidate.to_dict() for candidate in candidates],
-                        }
-                        report_path = discovery_dir / "equation_candidates.json"
-                        report_path.write_text(json.dumps(discovery_payload, indent=2, allow_nan=False), encoding="utf-8")
-                        discovery_report = str(report_path)
-                    record_run(discovery_id, discovery_dir, "graph-equation-discovery", discovery_started, status="CANDIDATE", details={"digitization_run": run_id, "curve": preferred_curve, "candidate_count": len(candidates), "candidate_report": discovery_report, "evidence_status": "EMPIRICAL_FIT"})
+                    discovery_payload = {
+                        "status": "CANDIDATE" if candidates_by_curve else "PARTIAL",
+                        "evidence_status": "EMPIRICAL_FIT",
+                        "digitization_run": run_id,
+                        "curve": preferred_curve,
+                        "curves": {name: [candidate.to_dict() for candidate in items] for name, items in candidates_by_curve.items()},
+                        "candidate_errors": candidate_errors,
+                        "validation_policy": "Each selected curve was fitted independently. Complete groups for every fifth distinct x coordinate were held out together; training-only initial guesses; ranked by held-out RMSE, then full-fit BIC and parameter count.",
+                        "interpretation": "Candidates approximate each selected digitized curve; they are not evidence of the original source equation.",
+                        "candidates": [candidate.to_dict() for candidate in candidates],
+                    }
+                    report_path = discovery_dir / "equation_candidates.json"
+                    report_path.write_text(json.dumps(discovery_payload, indent=2, allow_nan=False), encoding="utf-8")
+                    discovery_report = str(report_path)
+                    status = "CANDIDATE" if candidates_by_curve else "FAILED"
+                    report_error = None if candidates_by_curve else "No selected curve produced a candidate fit"
+                    record_run(discovery_id, discovery_dir, "graph-equation-discovery", discovery_started, status=status, error=report_error, details={"digitization_run": run_id, "curves": list(candidates_by_curve), "candidate_counts": {name: len(items) for name, items in candidates_by_curve.items()}, "candidate_errors": candidate_errors, "candidate_report": discovery_report, "evidence_status": "EMPIRICAL_FIT"})
                 except Exception as error:
-                    record_run(discovery_id, discovery_dir, "graph-equation-discovery", discovery_started, status="FAILED", error=str(error), details={"digitization_run": run_id, "curve": preferred_curve, "evidence_status": "EMPIRICAL_FIT"})
-                    st.warning(f"Digitization completed, but equation discovery needs review: {error}")
+                    record_run(discovery_id, discovery_dir, "graph-equation-discovery", discovery_started, status="FAILED", error=str(error), details={"digitization_run": run_id, "evidence_status": "EMPIRICAL_FIT"})
+                    st.warning(f"Digitization completed, but the candidate report could not be saved: {error}")
             st.session_state["latest_graph_analysis"] = {
                 "run_id": run_id, "run_dir": str(run_dir), "source": source, "source_context": source_context,
-                "result": result, "calibration": calibration, "crop": crop,
+                "result": result, "calibration": calibration, "crop": crop, "plot_region": plot_region,
                 "calibration_provenance": st.session_state.get(f"{prefix}_calibration_provenance", "USER_PROVIDED"),
-                "extraction_settings": {"colors": [{"name": name, "rgb": rgb} for name, rgb in named_colors], "color_tolerance": tolerance, "maximum_points_per_curve": max_points},
+                "extraction_settings": {"plot_region_pixels": list(plot_region), "colors": [{"name": name, "rgb": rgb} for name, rgb in named_colors], "color_tolerance": tolerance, "maximum_points_per_curve": max_points},
                 "exclusion_regions": exclusion_regions,
                 "artifacts": {key: str(path) for key, path in artifacts.items()}, "fit": None,
-                "candidates": candidates, "candidate_report": discovery_report,
+                "candidates": candidates, "candidates_by_curve": candidates_by_curve,
+                "candidate_errors": candidate_errors, "candidate_report": discovery_report,
                 "candidate_curve": named_colors[0][0] if candidates and analyze_clicked else None,
-                "settings_signature": (crop, calibration, tuple(named_colors), float(tolerance), int(max_points), exclusion_regions),
+                "settings_signature": (crop, plot_region, calibration, tuple(named_colors), float(tolerance), int(max_points), exclusion_regions, axis_pixels),
             }
         except Exception as error:
             record_run(run_id, run_dir, "graph-digitization", started, status="FAILED", error=str(error), details={"source": source.source_name, "source_page": source.page_number})
             st.error(f"Curve digitization failed.\n\nReason: {error}\n\nReview the crop, calibration, selected curve colors, and tolerance.")
 
     latest = st.session_state.get("latest_graph_analysis")
-    current_signature = (crop, calibration, tuple(named_colors), float(tolerance), int(max_points), exclusion_regions)
+    current_signature = (crop, plot_region, calibration, tuple(named_colors), float(tolerance), int(max_points), exclusion_regions, axis_pixels)
     if not latest or latest.get("source", source).source_sha256 != source.source_sha256 or latest.get("source", source).page_number != source.page_number or latest.get("settings_signature") != current_signature:
         st.info("Set a crop, confirm calibration and curve colors, then extract points. Changed settings require a fresh digitization run.")
         return
@@ -589,6 +646,21 @@ def render_graph_image_page(
     summary[1].metric("Curves", data["curve_name"].nunique())
     summary[2].metric("X range", f"{data['x'].min():.5g} – {data['x'].max():.5g}")
     summary[3].metric("Y range", f"{data['y'].min():.5g} – {data['y'].max():.5g}")
+    series_diagnostics = []
+    plot_width = max(1, latest.get("plot_region", crop)[2] - latest.get("plot_region", crop)[0])
+    for name, series in data.groupby("curve_name", sort=False):
+        series_diagnostics.append({
+            "Curve": name,
+            "Points": len(series),
+            "Unique pixel columns": int(series["pixel_x"].nunique()),
+            "Multiple observations in columns": int(len(series) - series["pixel_x"].nunique()),
+            "Plot-width coverage": f"{series['pixel_x'].nunique() / plot_width:.0%}",
+            "X range": f"{series['x'].min():.5g} – {series['x'].max():.5g}",
+            "Y range": f"{series['y'].min():.5g} – {series['y'].max():.5g}",
+        })
+    if len(series_diagnostics) > 1:
+        st.caption("Per-curve digitization diagnostics. Curves remain separate series; repeated x pixels indicate multiple resolvable vertical trace clusters in a raster column.")
+        st.dataframe(pd.DataFrame(series_diagnostics), use_container_width=True, hide_index=True)
     if result.warnings:
         for warning in result.warnings:
             st.warning(warning)
@@ -609,6 +681,8 @@ def render_graph_image_page(
             latest["fit"] = None
             latest.pop("fit_paths", None)
             latest.pop("candidates", None)
+            latest.pop("candidates_by_curve", None)
+            latest.pop("candidate_errors", None)
             st.session_state["latest_graph_analysis"] = latest
         if "reviewed_data" in latest and st.button("Save reviewed point corrections", key=f"{prefix}_save_reviewed_points"):
             reviewed_path = Path(latest["run_dir"]) / "reviewed_digitized_data.csv"
@@ -631,7 +705,7 @@ def render_graph_image_page(
         if data_png.is_file():
             st.image(str(data_png), caption="Digitized data coordinates", use_container_width=True)
         if pixel_overlay.is_file():
-            st.image(str(pixel_overlay), caption="Median pixel picks over source crop", use_container_width=True)
+            st.image(str(pixel_overlay), caption="Digitized pixel picks over source crop; multiple vertical clusters may be preserved in a column", use_container_width=True)
     with fit_tab:
         st.subheader("6 · Fit or compare equations")
         curve_names = list(data["curve_name"].drop_duplicates())
@@ -673,36 +747,43 @@ def render_graph_image_page(
                         "status": "CANDIDATE",
                         "digitization_run": latest["run_id"],
                         "curve": curve_name,
-                        "validation_policy": "Every fifth x-sorted observation was held out; initial guesses were derived from the training subset only; candidates are ranked by held-out RMSE, then BIC and parameter count.",
+                        "validation_policy": "Complete groups for every fifth distinct x coordinate were held out together; initial guesses were derived from the training subset only; candidates are ranked by held-out RMSE, then BIC and parameter count.",
                         "interpretation": "Candidate equations approximate digitized points; they are not evidence of the original source equation.",
                         "candidates": [candidate.to_dict() for candidate in candidates],
                     }
                     (run_dir / "equation_candidates.json").write_text(json.dumps(payload, indent=2, allow_nan=False), encoding="utf-8")
                     record_run(run_id, run_dir, "graph-equation-discovery", started, status="CANDIDATE", details={"digitization_run": latest["run_id"], "curve": curve_name, "candidate_count": len(candidates), "candidate_report": str(run_dir / "equation_candidates.json"), "validation_policy": payload["validation_policy"]})
                     latest["candidates"] = candidates
+                    latest.setdefault("candidates_by_curve", {})[curve_name] = candidates
+                    latest.setdefault("candidate_errors", {}).pop(curve_name, None)
                     latest["candidate_curve"] = curve_name
                     latest["candidate_run_dir"] = str(run_dir)
                     st.session_state["latest_graph_analysis"] = latest
                 except Exception as error:
                     record_run(run_id, run_dir, "graph-equation-discovery", started, status="FAILED", error=str(error), details={"digitization_run": latest["run_id"], "curve": curve_name})
                     st.error(f"Candidate discovery failed.\n\nReason: {error}")
-            candidates: list[CandidateFit] = latest.get("candidates", [])
-            if candidates and latest.get("candidate_curve") not in {None, curve_name}:
-                st.info(f"The visible candidates belong to {latest['candidate_curve']}. Run discovery for {curve_name} to replace them.")
-                candidates = []
+            candidates_by_curve: dict[str, list[CandidateFit]] = latest.get("candidates_by_curve", {})
+            candidates: list[CandidateFit] = candidates_by_curve.get(curve_name, [])
+            if not candidates and latest.get("candidate_curve") == curve_name:
+                candidates = latest.get("candidates", [])
+            if latest.get("candidate_errors", {}).get(curve_name):
+                st.warning(f"Candidate discovery for {curve_name} needs review: {latest['candidate_errors'][curve_name]}")
             if candidates:
+                observed_y_span = max(float(np.ptp(selected_curve["y"].to_numpy(dtype=float))), np.finfo(float).eps)
                 st.dataframe(pd.DataFrame([{
                     "Rank": index + 1,
                     "Family": candidate.family,
-                    "Status": candidate.result.status,
+                    "Optimizer status": candidate.result.status,
                     "Evidence": candidate.evidence_status,
                     "Holdout RMSE": candidate.holdout_metrics.get("rmse") if candidate.holdout_metrics else candidate.holdout_rmse,
+                    "Holdout RMSE / observed Y span": f"{candidate.holdout_rmse / observed_y_span:.1%}" if candidate.holdout_rmse is not None else "n/a",
                     "Holdout MAE": candidate.holdout_metrics.get("mae") if candidate.holdout_metrics else None,
                     "Fit RMSE": candidate.result.metrics.get("rmse"),
                     "Fit MAE": candidate.result.metrics.get("mae"),
                     "R²": candidate.result.metrics.get("r_squared"),
                     "BIC": candidate.bic,
                 } for index, candidate in enumerate(candidates)]), use_container_width=True, hide_index=True)
+                st.caption("Optimizer success means the parameters converged, not that the equation adequately represents the graph. Ranking is relative to the supported families; compare held-out error with the observed Y variation and inspect residuals across both the transient and tail.")
                 labels = [f"{candidate.family} · holdout RMSE {candidate.holdout_rmse:.4g}" for candidate in candidates]
                 candidate_index = st.selectbox("Candidate to inspect", range(len(candidates)), format_func=lambda index: labels[index], key=f"{prefix}_candidate_selected")
                 selected_candidate = candidates[candidate_index]
@@ -726,6 +807,9 @@ def render_graph_image_page(
                 r_squared = selected_candidate.result.metrics.get("r_squared")
                 candidate_metrics[4].metric("R²", "not defined" if r_squared is None else f"{r_squared:.6g}")
                 st.caption(f"Evidence classification: **{selected_candidate.evidence_status}** · ranking: held-out RMSE, with BIC and parameter count as tie-breakers. Estimates are conditional on the selected curve, calibration, and candidate family.")
+                holdout_r_squared = (selected_candidate.holdout_metrics or {}).get("r_squared")
+                if holdout_r_squared is not None and holdout_r_squared < 0:
+                    st.warning("This candidate performs worse than a constant-mean reference on held-out points; treat it as a weak candidate despite optimizer convergence.")
                 for warning in selected_candidate.result.warnings:
                     st.warning(warning)
                 from research_plotter.plotting.graph_image import plot_fit_overlay, plot_fit_residuals

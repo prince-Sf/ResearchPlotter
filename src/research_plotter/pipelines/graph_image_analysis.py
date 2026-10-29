@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 from research_plotter.analysis.equation_fitting import EquationFitResult
-from research_plotter.analysis.graph_digitization import AxisCalibration, DigitizationResult, GraphImage, long_to_wide
+from research_plotter.analysis.graph_digitization import AxisCalibration, DigitizationResult, GraphImage, long_to_wide, validate_crop
 from research_plotter.plotting.core import save_figure
 from research_plotter.plotting.graph_image import plot_digitized_comparison, plot_digitized_data, plot_fit_overlay, plot_fit_residuals, plot_pixel_overlay
 from research_plotter.utils.numerics import error_metrics
@@ -29,6 +29,7 @@ def save_digitization_artifacts(
     *,
     calibration: AxisCalibration,
     crop: tuple[int, int, int, int],
+    plot_region: tuple[int, int, int, int] | None = None,
     output_dir: str | Path,
     experiment_id: str | None = None,
     extraction_settings: dict[str, object] | None = None,
@@ -41,9 +42,10 @@ def save_digitization_artifacts(
     destination = Path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
     left, top, right, bottom = crop
-    crop_image = source.image.crop(crop)
+    extraction_region = validate_crop(source.image.size, plot_region or result.plot_region_pixels or crop)
+    region_image = source.image.crop(extraction_region)
     crop_path = destination / "plot_region.png"
-    crop_image.save(crop_path, format="PNG")
+    region_image.save(crop_path, format="PNG")
     long_path = destination / "digitized_data_long.csv"
     wide_path = destination / "digitized_data_wide.csv"
     result.data.to_csv(long_path, index=False)
@@ -52,7 +54,7 @@ def save_digitization_artifacts(
     figure_dir.mkdir(exist_ok=True)
     data_figure = plot_digitized_data(result.data)
     data_figures = save_figure(data_figure, figure_dir / "digitized_data.png", formats=["png", "svg", "pdf"])
-    overlay_figure = plot_pixel_overlay(crop_image, result.data, crop_origin=(left, top), calibration=calibration)
+    overlay_figure = plot_pixel_overlay(source.image.crop(crop), result.data, crop_origin=(left, top), calibration=calibration)
     overlay_figures = save_figure(overlay_figure, figure_dir / "pixel_overlay.png", formats=["png", "svg", "pdf"])
     metadata = {
         "experiment_id": experiment_id,
@@ -68,7 +70,12 @@ def save_digitization_artifacts(
         },
         "source_context": source_context or {},
         "crop_coordinates_pixels": {"left": left, "top": top, "right": right, "bottom": bottom},
-        "crop_dimensions_pixels": list(crop_image.size),
+        "crop_dimensions_pixels": list(source.image.crop(crop).size),
+        "extraction_plot_region_pixels": {
+            "left": extraction_region[0], "top": extraction_region[1],
+            "right": extraction_region[2], "bottom": extraction_region[3],
+        },
+        "extraction_plot_region_dimensions_pixels": list(region_image.size),
         "exclusion_regions_pixels": [
             {"left": left, "top": top, "right": right, "bottom": bottom}
             for left, top, right, bottom in exclusion_regions

@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 import sympy as sp
 from scipy.optimize import OptimizeWarning, curve_fit
+from scipy.signal import find_peaks, periodogram, savgol_filter
 import warnings as python_warnings
 
 from research_plotter.models.formula_spec import FormulaSpec, evaluate_formula, parse_equation_text, parse_safe_expression
@@ -119,6 +120,15 @@ def _validate_xy(data: pd.DataFrame, x_column: str, y_column: str) -> tuple[np.n
     if np.unique(x).size < 3:
         raise ValueError("At least three distinct x values are required for fitting")
     return x, y
+
+
+def _grouped_holdout_mask(x: np.ndarray, *, stride: int = 5) -> np.ndarray:
+    """Hold out complete x-coordinate groups to avoid same-pixel leakage."""
+    if stride < 2:
+        raise ValueError("Holdout stride must be at least 2")
+    unique_x, group_index = np.unique(np.asarray(x, dtype=float), return_inverse=True)
+    held_out_groups = np.arange(len(unique_x)) % stride == 0
+    return held_out_groups[group_index]
 
 
 def _compile_formula(template: str, independent_variable: str) -> FormulaSpec:
@@ -257,10 +267,11 @@ def _candidate_templates(
     y_range = max(float(np.ptp(y)), 1e-6)
     x_range = max(float(np.ptp(x)), 1e-6)
     y_min, y_max = float(np.min(y)), float(np.max(y))
+    oscillation_amplitude, damping_rate, angular_frequency, phase, equilibrium = _estimate_oscillation_initials(x, y)
     templates.extend([
         ("exponential", "y = a*exp(b*x)+c", {"a": y_range, "b": 0.0, "c": y_min}),
-        ("sinusoidal", "y = a*sin(b*x+c)+d", {"a": y_range / 2, "b": 2 * np.pi / x_range, "c": 0.0, "d": float(np.mean(y))}),
-        ("damped sinusoidal", "y = a*exp(-k*x)*sin(w*x+p)+c", {"a": y_range / 2, "k": 0.01 / x_range, "w": 2 * np.pi / x_range, "p": 0.0, "c": float(np.mean(y))}),
+        ("sinusoidal", "y = a*sin(b*x+c)+d", {"a": oscillation_amplitude, "b": angular_frequency, "c": phase, "d": equilibrium}),
+        ("damped sinusoidal", "y = a*exp(-k*x)*sin(w*x+p)+c", {"a": oscillation_amplitude, "k": damping_rate, "w": angular_frequency, "p": phase, "c": equilibrium}),
         ("logistic", "y = a/(1+exp(-k*(x-x0)))+c", {"a": y_range, "k": 1.0 / x_range, "x0": float(np.median(x)), "c": y_min}),
     ])
     valid_x = x if domain_x is None else np.asarray(domain_x, dtype=float)
@@ -270,6 +281,151 @@ def _candidate_templates(
     if np.all(valid_x > 0) and np.all(valid_y > 0):
         templates.append(("power law", "y = a*x**b", {"a": float(np.median(y)), "b": 1.0}))
     return templates
+
+
+def _estimate_oscillation_initials(x: np.ndarray, y: np.ndarray) -> tuple[float, float, float, float, float]:
+    """Estimate oscillation seeds from repeated peak spacing and peak decay.
+
+    The estimates only seed the candidate fitter; they do not impose a
+    model on the graph. Positive peaks estimate a period, extrema envelopes
+    estimate decay, and a sine/cosine least-squares projection estimates phase
+    and amplitude. When the signal does not support those estimates, a broad
+    data-span seed is retained and candidate validation remains decisive.
+    """
+    order = np.argsort(x, kind="stable")
+    sorted_x, sorted_y = np.asarray(x, dtype=float)[order], np.asarray(y, dtype=float)[order]
+    unique_x, inverse = np.unique(sorted_x, return_inverse=True)
+    if len(unique_x) >= 3 and len(unique_x) != len(sorted_x):
+        # Multiple y samples at one pixel x can represent separate trace
+        # branches, not independent repeats. Use a robust median only for
+        # estimating a seed; retain all observations in the eventual fit.
+        sorted_y = np.asarray(
+            [np.median(sorted_y[inverse == index]) for index in range(len(unique_x))],
+            dtype=float,
+        )
+        sorted_x = unique_x
+    x_span = max(float(np.ptp(sorted_x)), np.finfo(float).eps)
+    data_span = max(float(np.ptp(sorted_y)), np.finfo(float).eps)
+    tail_count = max(3, int(np.ceil(len(sorted_y) * 0.15)))
+    equilibrium = float(np.median(sorted_y[-tail_count:]))
+    residual = sorted_y - equilibrium
+    amplitude_scale = float(np.quantile(np.abs(residual), 0.95))
+    angular_frequency = 2.0 * np.pi / x_span
+    damping_rate = 0.01 / x_span
+    phase = 0.0
+    amplitude = max(amplitude_scale, data_span / 2.0, np.finfo(float).eps)
+
+    early_limit = sorted_x[0] + 0.4 * x_span
+    early = sorted_x <= early_limit
+    early_x = sorted_x[early]
+    early_residual = residual[early]
+    prominence = max(data_span * 0.025, np.finfo(float).eps)
+
+    # The long equilibrium tail can dilute a full-span spectrum, and a single
+    # periodogram peak can be a pixel alias. Estimate on several early windows
+    # and accept frequency only when independent window lengths agree.
+    spectral_estimates: list[float] = []
+    for fraction in (0.2, 0.3, 0.4):
+        selected = sorted_x <= sorted_x[0] + fraction * x_span
+        window_x, window_y = sorted_x[selected], residual[selected]
+        if len(window_x) < 16 or window_x[-1] <= window_x[0]:
+            continue
+        grid_size = min(4096, max(128, len(window_x) * 3))
+        grid_x = np.linspace(float(window_x[0]), float(window_x[-1]), grid_size)
+        grid_y = np.interp(grid_x, window_x, window_y)
+        smooth_window = max(5, int(round(grid_size * 0.01)) | 1)
+        smooth_window = min(smooth_window, grid_size if grid_size % 2 else grid_size - 1)
+        if smooth_window >= 5:
+            grid_y = savgol_filter(grid_y, smooth_window, polyorder=2)
+        detrended = grid_y - np.polyval(np.polyfit(grid_x, grid_y, 1), grid_x)
+        frequencies, power = periodogram(
+            detrended,
+            fs=1.0 / float(np.mean(np.diff(grid_x))),
+            window="hann",
+        )
+        duration = float(grid_x[-1] - grid_x[0])
+        eligible = (frequencies >= 1.5 / duration) & (frequencies > 0) & np.isfinite(power)
+        if not eligible.any():
+            continue
+        power_peaks, _ = find_peaks(power)
+        power_peaks = power_peaks[eligible[power_peaks]] if len(power_peaks) else np.flatnonzero(eligible)
+        if not len(power_peaks):
+            continue
+        dominant = int(power_peaks[np.argmax(power[power_peaks])])
+        background = float(np.median(power[eligible]))
+        if power[dominant] > max(background * 3.0, np.finfo(float).tiny):
+            spectral_estimates.append(float(2.0 * np.pi * frequencies[dominant]))
+
+    spectral_frequency: float | None = None
+    if len(spectral_estimates) >= 2:
+        consensus_groups = [
+            [value for value in spectral_estimates if abs(value - center) / center <= 0.25]
+            for center in spectral_estimates
+        ]
+        consensus = max(consensus_groups, key=len)
+        if len(consensus) >= 2:
+            spectral_frequency = float(np.median(consensus))
+
+    profile = residual.copy()
+    if len(profile) >= 7:
+        smooth_window = min(11, len(profile) if len(profile) % 2 else len(profile) - 1)
+        if smooth_window >= 5:
+            profile = savgol_filter(profile, smooth_window, polyorder=2)
+    peak_distance = max(1, int(round(len(sorted_x) * 0.005)))
+    positive_peaks, _ = find_peaks(profile, prominence=prominence, distance=peak_distance)
+    negative_peaks, _ = find_peaks(-profile, prominence=prominence, distance=peak_distance)
+    positive_peaks = positive_peaks[sorted_x[positive_peaks] <= early_limit]
+    negative_peaks = negative_peaks[sorted_x[negative_peaks] <= early_limit]
+    extrema = np.sort(np.r_[positive_peaks, negative_peaks])
+    peak_frequency: float | None = None
+    if len(positive_peaks) >= 2:
+        periods = np.diff(sorted_x[positive_peaks])
+        periods = periods[periods > 0]
+        if len(periods):
+            peak_frequency = float(2.0 * np.pi / np.median(periods))
+    elif len(extrema) >= 3:
+        half_periods = np.diff(sorted_x[extrema])
+        half_periods = half_periods[half_periods > 0]
+        if len(half_periods):
+            peak_frequency = float(np.pi / np.median(half_periods))
+    if peak_frequency is not None and np.isfinite(peak_frequency) and peak_frequency > 0:
+        angular_frequency = peak_frequency
+    if spectral_frequency is not None and (
+        peak_frequency is None
+        or not np.isfinite(peak_frequency)
+        or abs(peak_frequency - spectral_frequency) / spectral_frequency > 0.15
+    ):
+        # Prefer a stable multi-window spectrum when peak spacing is badly
+        # disrupted by overlapping branches; retain peak timing when both
+        # independent estimates agree.
+        angular_frequency = spectral_frequency
+
+    envelope_indices = extrema[np.abs(residual[extrema]) >= max(prominence, amplitude_scale * 0.05)] if len(extrema) else np.asarray([], dtype=int)
+    if len(envelope_indices) >= 3:
+        log_amplitude = np.log(np.maximum(np.abs(residual[envelope_indices]), np.finfo(float).tiny))
+        slope = float(np.polyfit(sorted_x[envelope_indices], log_amplitude, 1)[0])
+        if np.isfinite(slope):
+            damping_rate = max(0.0, -slope)
+
+    if int(early.sum()) >= 6 and np.isfinite(angular_frequency) and angular_frequency > 0:
+        weights = np.exp(np.clip(damping_rate * (early_x - sorted_x[0]), -20.0, 20.0))
+        adjusted = early_residual * weights
+        design = np.column_stack((np.sin(angular_frequency * early_x), np.cos(angular_frequency * early_x)))
+        try:
+            coefficients, *_ = np.linalg.lstsq(design, adjusted, rcond=None)
+            local_amplitude = float(np.hypot(coefficients[0], coefficients[1]))
+            if np.isfinite(local_amplitude) and local_amplitude > 0:
+                amplitude = local_amplitude * float(np.exp(np.clip(damping_rate * sorted_x[0], -20.0, 20.0)))
+                phase = float(np.arctan2(coefficients[1], coefficients[0]))
+        except np.linalg.LinAlgError:
+            pass
+    return (
+        float(max(amplitude, np.finfo(float).eps)),
+        float(damping_rate),
+        float(angular_frequency),
+        float(phase),
+        equilibrium,
+    )
 
 
 def discover_equation_candidates(
@@ -283,16 +439,21 @@ def discover_equation_candidates(
 ) -> list[CandidateFit]:
     """Compare a small allowlisted family set with deterministic holdout points.
 
-    Every fifth point is held out when enough points exist. Family ranking uses
-    holdout RMSE first and BIC as a complexity-aware tie-breaker. Results remain
-    exploratory candidates and are never described as recovered source models.
+    Every fifth distinct x-coordinate group is held out when enough groups
+    exist. Repeated y branches in one raster x column stay together to avoid
+    leaking same-pixel observations between training and validation. Family
+    ranking uses holdout RMSE first and BIC as a complexity-aware tie-breaker.
+    Results remain exploratory candidates and are never described as recovered
+    source models.
     """
     x, y = _validate_xy(data, x_column, y_column)
-    if len(x) < 12:
+    if np.unique(x).size < 12:
         raise ValueError("At least 12 points are required for candidate discovery with held-out validation")
     if max_evaluations_per_fit < 100:
         raise ValueError("max_evaluations_per_fit must be at least 100")
-    validation_mask = np.arange(len(x)) % 5 == 0
+    validation_mask = _grouped_holdout_mask(x)
+    if validation_mask.all() or (~validation_mask).sum() < 6:
+        raise ValueError("Not enough distinct x-coordinate groups remain for training and held-out validation")
     train = pd.DataFrame({x_column: x[~validation_mask], y_column: y[~validation_mask]})
     validation_x, validation_y = x[validation_mask], y[validation_mask]
     successes: list[CandidateFit] = []

@@ -9,8 +9,11 @@ not proof of the equation or model used by the paper.
 1. Upload PNG, JPG/JPEG, WEBP, TIFF/TIF, or open a selected page from a PDF.
    PDF page rendering uses the existing PyMuPDF dependency. The source remains
    unchanged; rendered previews and selected crops are separate artifacts.
-2. Crop to one main plotting region. Inset plots should be digitized as a
-   separate region with their own calibration.
+2. Select one main plotting region. This rectangle controls which pixels are
+   extracted. Inset plots should be selected as a separate region with their
+   own calibration; inset pixels are never interpreted with the main axes.
+   The analysis crop may be broader than the extraction region in backend
+   workflows, and the selected bounds are saved in digitization metadata.
 3. Graph Image Analyzer attempts to detect the plot axes, tick marks, and
    nearby tick labels. It uses local Tesseract OCR when available; no image is
    sent to a network service. Tick-label alignment helps distinguish plot axes
@@ -36,12 +39,18 @@ not proof of the equation or model used by the paper.
    calibration remain available; curve shape is never used to invent axis
    values.
 4. Review detected RGB candidates, choose and name curves, and adjust color
-   tolerance. The reference implementation uses RGB distance segmentation
-   and the median detected y pixel in each x column to reduce line-thickness
-   effects. It can be confused by overlapping curves, labels, markers, dense
-   grids, and same-color annotations; use a tight crop and inspect the pixel
-   overlay.
-5. Export digitized points in long form (`curve_name`, `pixel_x`, `pixel_y`,
+   tolerance. Calibration anchors define a coordinate mapping only; interior
+   tick anchors do not clip curve observations outside their pixel interval.
+   The mapping may be extrapolated within the selected plot region (including
+   in log coordinates), and edge extrapolation is called out for review. The
+   reference implementation uses RGB distance segmentation and retains
+   separate resolvable vertical pixel clusters in each x column. It can still
+   be confused by overlapping curves, labels, markers, dense grids, and
+   same-color annotations; use exclusions and inspect the pixel overlay.
+5. Each selected curve remains an independent named series. The combined
+   extraction action runs candidate discovery separately for each selected
+   series and records per-series errors without discarding successful fits.
+   Export digitized points in long form (`curve_name`, `pixel_x`, `pixel_y`,
    `x`, `y`) or wide form (`x`, one column per curve). A JSON sidecar records
    the source hash, image/page dimensions, crop, calibration, settings,
    provenance, point counts, and warnings.

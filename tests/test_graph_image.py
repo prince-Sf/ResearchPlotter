@@ -10,8 +10,8 @@ import pandas as pd
 from PIL import Image, ImageDraw
 import pytest
 
-from research_plotter.analysis.equation_fitting import discover_equation_candidates, fit_equation
-from research_plotter.analysis.axis_calibration import AutomaticCalibrationResult, OCRWord, TickLabel, _fit_axis, _looks_like_lost_decimal, _settle_tick_reviews, auto_calibrate_axes, local_ocr_available, parse_tick_label, recognize_local_words, validate_auto_calibration
+from research_plotter.analysis.equation_fitting import _estimate_oscillation_initials, _grouped_holdout_mask, discover_equation_candidates, fit_equation
+from research_plotter.analysis.axis_calibration import AutomaticCalibrationResult, OCRWord, TickLabel, _degree_suffix_candidate, _fit_axis, _looks_like_lost_decimal, _settle_tick_reviews, auto_calibrate_axes, local_ocr_available, parse_tick_label, recognize_local_words, validate_auto_calibration
 from research_plotter.analysis.graph_digitization import AxisCalibration, GraphImage, detect_curve_colors, digitize_color_curves, load_graph_image, long_to_wide, render_pdf_page
 from research_plotter.models.formula_spec import parse_equation_text
 from research_plotter.pipelines.graph_image_analysis import compare_digitized_reference, save_digitization_artifacts, save_fit_artifacts
@@ -232,20 +232,30 @@ def test_automatic_calibration_recovers_pi_ticks_negative_ranges_and_downstream_
     assert [tick.value for tick in result.x_ticks] == pytest.approx([-math.pi / 2, 0, math.pi / 2, math.pi, 3 * math.pi / 2, 2 * math.pi])
     calibration = validate_auto_calibration(result, image.size, crop)
     assert calibration is not None
-    assert calibration.x_left_px == pytest.approx(x_pixels[0])
-    assert calibration.x_right_px == pytest.approx(x_pixels[-1])
+    assert calibration.x_left_px == pytest.approx(x_pixels[0], abs=1)
+    assert calibration.x_right_px == pytest.approx(x_pixels[-1], abs=1)
     assert calibration.x_min == pytest.approx(-math.pi / 2)
     assert calibration.x_max == pytest.approx(2 * math.pi)
     assert calibration.y_min == pytest.approx(-1)
     assert calibration.y_max == pytest.approx(1)
     sample_x, sample_y = calibration.pixel_to_data([x_pixels[0], x_pixels[-1]], [y_pixels[0], y_pixels[-1]])
-    assert sample_x == pytest.approx([-math.pi / 2, 2 * math.pi])
-    assert sample_y == pytest.approx([1, -1])
+    assert sample_x == pytest.approx([-math.pi / 2, 2 * math.pi], abs=0.02)
+    assert sample_y == pytest.approx([1, -1], abs=0.02)
     # Pixel-to-data results are valid inputs to the existing digitizer pipeline.
-    digitized = digitize_color_curves(image, crop=crop, calibration=calibration, colors=[("sine", (214, 39, 40))], color_tolerance=35)
+    digitized = digitize_color_curves(
+        image,
+        crop=crop,
+        plot_region=result.plot_region,
+        calibration=calibration,
+        colors=[("sine", (214, 39, 40))],
+        color_tolerance=35,
+    )
     assert len(digitized.data) > 250
     assert digitized.data["x"].min() >= -math.pi / 2 - 0.02
-    assert digitized.data["x"].max() <= 2 * math.pi + 0.02
+    # The selected frame extends a few antialiased pixels beyond the outer
+    # labeled tick, so calibrated coordinates may legitimately extrapolate
+    # slightly past the anchor value while staying inside the plot region.
+    assert digitized.data["x"].max() <= 2 * math.pi + 0.04
 
 
 def test_automatic_calibration_uses_absolute_image_pixels_for_nonzero_crop_origin():
@@ -310,6 +320,15 @@ def test_degree_fixture_calibration_parser_does_not_reinterpret_plain_large_numb
     # marker or zero. Axis-wide OCR evidence must resolve that ambiguity.
 
 
+def test_degree_glyph_ocr_alternative_is_review_only_and_requires_degree_context():
+    assert _degree_suffix_candidate("-905", degree_context=False) is None
+    assert _degree_suffix_candidate("-905", degree_context=True) == ("-90°", -90.0)
+    assert _degree_suffix_candidate("3605", degree_context=True) == ("360°", 360.0)
+    # The ordinary parser is deliberately unchanged: the candidate alternative
+    # must not silently replace a valid OCR numeral.
+    assert parse_tick_label("3605") == 3605
+
+
 def test_log_scale_requires_three_consistent_logarithmic_tick_anchors():
     # A log line can pass exactly through any two positive points. These six
     # radian ticks form a linear pixel/value mapping, although two positive
@@ -328,6 +347,36 @@ def test_log_scale_requires_three_consistent_logarithmic_tick_anchors():
     assert fit.last_value == pytest.approx(2 * math.pi)
 
 
+def test_log_scale_is_rejected_when_any_axis_tick_is_nonpositive():
+    ticks = (
+        TickLabel("x", 10, "-1", -1, 90),
+        TickLabel("x", 20, "1", 1, 90),
+        TickLabel("x", 30, "10", 10, 90),
+        TickLabel("x", 40, "100", 100, 90),
+    )
+    fit = _fit_axis(ticks, "x")
+    assert fit is not None
+    assert fit.scale == "linear"
+
+
+def test_axis_fit_refines_calibration_endpoints_from_multiple_accepted_ticks():
+    values = np.asarray([-2.0, -1.0, 0.0, 1.0, 2.0])
+    pixels = np.asarray([54.0, 98.0, 152.0, 198.0, 254.0])
+    ticks = tuple(
+        TickLabel("x", pixel, f"{value:g}", value, 95)
+        for pixel, value in zip(pixels, values)
+    )
+
+    fitted = _fit_axis(ticks, "x")
+
+    assert fitted is not None
+    slope, intercept = np.polyfit(values, pixels, 1)
+    assert fitted.first_pixel == pytest.approx(slope * values[0] + intercept)
+    assert fitted.last_pixel == pytest.approx(slope * values[-1] + intercept)
+    assert abs(fitted.first_pixel - pixels[0]) > 1
+    assert fitted.inlier_count == len(ticks)
+
+
 def test_automatic_calibration_detects_logarithmic_y_axis():
     image, crop, reader, _, _, (_, y_pixels) = _calibration_chart(size=(560, 400), y_values=[100, 10, 1])
     result = auto_calibrate_axes(image, crop, ocr_reader=reader)
@@ -338,7 +387,7 @@ def test_automatic_calibration_detects_logarithmic_y_axis():
     assert calibration.y_max == pytest.approx(100)
     assert calibration.y_min == pytest.approx(1)
     _, midpoint = calibration.pixel_to_data(calibration.x_left_px, (y_pixels[0] + y_pixels[-1]) / 2)
-    assert midpoint == pytest.approx(10)
+    assert midpoint == pytest.approx(10, abs=0.05)
 
 
 def test_automatic_calibration_supports_degree_ticks_without_radian_conversion():
@@ -371,8 +420,8 @@ def test_automatic_calibration_detects_logarithmic_x_and_y_together():
     midpoint_x, midpoint_y = calibration.pixel_to_data(
         [(x_pixels[0] + x_pixels[-1]) / 2], [(y_pixels[0] + y_pixels[-1]) / 2]
     )
-    assert midpoint_x[0] == pytest.approx(1)
-    assert midpoint_y[0] == pytest.approx(10)
+    assert midpoint_x[0] == pytest.approx(1, abs=0.01)
+    assert midpoint_y[0] == pytest.approx(10, abs=0.1)
 
 
 def test_automatic_calibration_handles_ordinary_numeric_ticks_and_rejects_ocr_outlier():
@@ -529,8 +578,10 @@ def test_real_sine_graph_fixture_calibrates_both_axes_and_reaches_digitization_a
     calibration = validate_auto_calibration(result, image.size, crop)
     assert calibration is not None
     assert result.x_scale == "linear"
-    assert calibration.x_left_px == pytest.approx(x_ticks[0].pixel, abs=2)
-    assert calibration.x_right_px == pytest.approx(x_ticks[-1].pixel, abs=2)
+    # Effective endpoints come from the accepted multi-tick regression, not
+    # the raw OCR text-box center of the first/last label.
+    assert calibration.x_left_px == pytest.approx(x_ticks[0].pixel, abs=8)
+    assert calibration.x_right_px == pytest.approx(x_ticks[-1].pixel, abs=8)
     assert calibration.x_min == pytest.approx(expected_x[0])
     assert calibration.x_max == pytest.approx(expected_x[-1])
     mapped_x, _ = calibration.pixel_to_data(
@@ -539,8 +590,8 @@ def test_real_sine_graph_fixture_calibrates_both_axes_and_reaches_digitization_a
     _, mapped_y = calibration.pixel_to_data(
         np.full(len(y_ticks), calibration.x_left_px), [tick.pixel for tick in y_ticks]
     )
-    assert mapped_x == pytest.approx(expected_x, abs=0.025)
-    assert mapped_y == pytest.approx(expected_y, abs=0.025)
+    assert mapped_x == pytest.approx(expected_x, abs=0.06)
+    assert mapped_y == pytest.approx(expected_y, abs=0.04)
 
     # The validated calibration must be the calibration consumed by the
     # existing digitizer and equation fitter, not merely populated UI fields.
@@ -560,6 +611,77 @@ def test_real_sine_graph_fixture_calibrates_both_axes_and_reaches_digitization_a
     assert fit.parameters["a"] == pytest.approx(1, abs=0.03)
     assert fit.parameters["b"] == pytest.approx(1, abs=0.03)
     assert fit.metrics["r_squared"] > 0.999
+
+
+@pytest.mark.skipif(not (Path(__file__).parent / "fixtures" / "real_sine_graph1.png").is_file(), reason="The user-provided degree graph fixture is unavailable")
+@pytest.mark.skipif(not local_ocr_available()[0], reason="Local Tesseract OCR is an optional integration dependency")
+def test_real_degree_sine_fixture_calibrates_from_separate_ocr_evidence_and_reaches_fit():
+    """Exercise the actual green degree graph with its ambiguous OCR labels."""
+    image = Image.open(Path(__file__).parent / "fixtures" / "real_sine_graph1.png").convert("RGB")
+    crop = (0, 0, image.width, image.height)
+    result = auto_calibrate_axes(image, crop)
+
+    assert result.status == "DETECTED"
+    assert result.confidence == "MEDIUM"
+    calibration = validate_auto_calibration(result, image.size, crop)
+    assert calibration is not None
+    assert result.x_scale == "linear" and result.y_scale == "linear"
+
+    accepted_x = sorted(
+        (tick for tick in result.review_ticks if tick.axis == "x" and tick.review_status == "ACCEPTED"),
+        key=lambda tick: tick.pixel,
+    )
+    accepted_y = sorted(
+        (tick for tick in result.review_ticks if tick.axis == "y" and tick.review_status == "ACCEPTED"),
+        key=lambda tick: tick.pixel,
+    )
+    expected_x = np.asarray([-360, -270, -180, -90, 0, 90, 180, 270, 360], dtype=float)
+    assert [tick.value for tick in accepted_x] == pytest.approx(expected_x)
+    assert [tick.value for tick in accepted_y] == pytest.approx([1, 0, -1])
+    mapped_x, _ = calibration.pixel_to_data(
+        [tick.pixel for tick in accepted_x], np.full(len(accepted_x), calibration.y_top_px)
+    )
+    _, mapped_y = calibration.pixel_to_data(
+        np.full(len(accepted_y), calibration.x_left_px), [tick.pixel for tick in accepted_y]
+    )
+    # This figure has no tick strokes; OCR label centers are the available
+    # horizontal anchors and can be offset slightly from the intended ticks.
+    assert np.max(np.abs(mapped_x - expected_x)) < 6.0
+    assert mapped_y == pytest.approx([1, 0, -1], abs=0.04)
+    assert any(
+        tick.value == pytest.approx(-180)
+        and tick.review_status == "ACCEPTED"
+        and "separate OCR evidence" in (tick.note or "")
+        for tick in accepted_x
+    )
+    assert any("review" in warning.lower() or "verify" in warning.lower() for warning in result.warnings)
+
+    colors = detect_curve_colors(image, crop)
+    green = max(colors, key=lambda color: color.rgb[1] - max(color.rgb[0], color.rgb[2]))
+    digitized = digitize_color_curves(
+        image,
+        crop=crop,
+        calibration=calibration,
+        colors=[("sine", green.rgb)],
+        color_tolerance=15,
+        axis_pixels=(result.x_axis_pixel, result.y_axis_pixel),
+    )
+    assert len(digitized.data) > 500
+    assert not any("axis" in warning.lower() for warning in digitized.warnings)
+    assert all("separate branches" in warning.lower() for warning in digitized.warnings)
+    expected_y = np.sin(np.deg2rad(digitized.data["x"].to_numpy()))
+    digitization_rmse = float(np.sqrt(np.mean((digitized.data["y"].to_numpy() - expected_y) ** 2)))
+    assert digitization_rmse < 0.11
+
+    fit = fit_equation(
+        digitized.data,
+        "y=a*sin(b*x+c)+d",
+        initial_guesses={"a": 1, "b": math.pi / 180, "c": 0, "d": 0},
+        bounds={"a": (0.5, 1.5), "b": (0.01, 0.03), "c": (-0.5, 0.5), "d": (-0.5, 0.5)},
+    )
+    assert fit.status == "FIT_SUCCESSFUL"
+    assert fit.parameters["b"] == pytest.approx(math.pi / 180, abs=0.001)
+    assert fit.metrics["r_squared"] > 0.99
 
 
 def test_leading_zero_ocr_is_not_trusted_as_a_tick_without_axis_corroboration():
@@ -628,8 +750,10 @@ def test_auto_calibration_retries_06_and_keeps_the_intermediate_tick_out_of_axis
     assert ambiguous.value == 6
     assert ambiguous.review_status == "REJECTED"
     assert ambiguous.pixel == pytest.approx(y_pixels[1])
-    assert result.values["y_top_px"] == pytest.approx(y_pixels[0])
-    assert result.values["y_bottom_px"] == pytest.approx(y_pixels[-1])
+    # The stored anchors are projected from the multi-tick regression rather
+    # than copied from the outer OCR label centers.
+    assert result.values["y_top_px"] == pytest.approx(y_pixels[0], abs=1)
+    assert result.values["y_bottom_px"] == pytest.approx(y_pixels[-1], abs=1)
     assert result.values["y_max"] == pytest.approx(1)
     assert result.values["y_min"] == pytest.approx(-1)
     assert result.values["y_bottom_px"] != pytest.approx(ambiguous.pixel)
@@ -856,23 +980,153 @@ def test_invalid_auto_candidate_is_rejected_without_changing_manual_edits(monkey
     assert any("candidate was rejected" in message for message in st.messages)
 
 
-def test_digitization_excludes_matching_pixels_outside_calibrated_axes():
+def test_digitization_uses_selected_plot_region_not_interior_calibration_anchors():
     image = Image.new("RGB", (100, 50), "white")
-    from PIL import ImageDraw
-
     ImageDraw.Draw(image).line((0, 25, 99, 25), fill=(214, 39, 40), width=3)
     calibration = AxisCalibration(10, 90, 0, 8, 10, 40, -1, 1)
     result = digitize_color_curves(
         image,
         crop=(0, 0, 100, 50),
+        plot_region=(5, 5, 95, 45),
         calibration=calibration,
         colors=[("line", (214, 39, 40))],
         color_tolerance=1,
     )
-    assert result.data["pixel_x"].min() >= 10
-    assert result.data["pixel_x"].max() <= 90
-    assert result.data["x"].min() >= 0
-    assert result.data["x"].max() <= 8
+    x_at_anchors, y_at_anchors = calibration.pixel_to_data([10, 90], [10, 40])
+    assert x_at_anchors == pytest.approx([0, 8])
+    assert y_at_anchors == pytest.approx([1, -1])
+    assert result.plot_region_pixels == (5, 5, 95, 45)
+    # Pixels outside the interior reference anchors survive, while pixels
+    # outside the selected plot-region rectangle remain excluded.
+    assert result.data["pixel_x"].min() == 5
+    assert result.data["pixel_x"].max() == 94
+    assert result.data["x"].min() < 0
+    assert result.data["x"].max() > 8
+
+
+def test_transient_curves_survive_interior_anchor_calibration_and_nonzero_crop_origin():
+    """Exercise raster digitization when graph bounds exceed calibration anchors."""
+    width, height = 420, 260
+    image = Image.new("RGB", (width, height), "white")
+    draw = ImageDraw.Draw(image)
+    plot_region = (60, 30, 360, 210)
+    crop = (20, 10, 400, 245)
+    left, top, right, bottom = plot_region
+    draw.rectangle((left, top, right - 1, bottom - 1), outline=(45, 45, 45), width=1)
+
+    x_to_pixel = lambda value: left + value / 9.0 * (right - left - 1)
+    y_to_pixel = lambda value: bottom - 1 - (value - 0.10) / (0.32 - 0.10) * (bottom - top - 1)
+    anchor_x_pixels = (x_to_pixel(2.0), x_to_pixel(8.0))
+    anchor_y_pixels = (y_to_pixel(0.28), y_to_pixel(0.14))
+    calibration = AxisCalibration(
+        anchor_x_pixels[0], anchor_x_pixels[1], 2.0, 8.0,
+        anchor_y_pixels[0], anchor_y_pixels[1], 0.14, 0.28,
+    )
+    functions = {
+        "red transient": (210, 45, 45, 0.0, -0.003),
+        "blue transient": (35, 95, 210, 0.45, 0.0),
+        "green transient": (30, 150, 70, -0.45, 0.003),
+    }
+    for red, green, blue, phase, equilibrium_offset in functions.values():
+        values = np.linspace(0.12, 8.88, 5000)
+        observations = 0.21 + equilibrium_offset + 0.095 * np.exp(-0.42 * values) * np.sin(7.5 * values + phase)
+        pixels = [(x_to_pixel(float(x)), y_to_pixel(float(y))) for x, y in zip(values, observations)]
+        draw.line(pixels, fill=(red, green, blue), width=1)
+
+    detected = detect_curve_colors(image, plot_region)
+    selected: list[tuple[str, tuple[int, int, int]]] = []
+    for name, (red, green, blue, _phase, _offset) in functions.items():
+        candidate = min(detected, key=lambda color: np.linalg.norm(np.asarray(color.rgb) - np.asarray((red, green, blue))))
+        assert np.linalg.norm(np.asarray(candidate.rgb) - np.asarray((red, green, blue))) < 3
+        selected.append((name, candidate.rgb))
+
+    result = digitize_color_curves(
+        image, crop=crop, plot_region=plot_region, calibration=calibration,
+        colors=selected, color_tolerance=2,
+    )
+    anchor_x, anchor_y = calibration.pixel_to_data(anchor_x_pixels, anchor_y_pixels)
+    assert anchor_x == pytest.approx([2.0, 8.0])
+    assert anchor_y == pytest.approx([0.28, 0.14])
+    assert result.plot_region_pixels == plot_region
+    assert set(result.data["curve_name"]) == set(functions)
+    assert result.data["pixel_x"].min() >= left
+    assert result.data["pixel_x"].max() < right
+    assert result.data["pixel_y"].min() >= top
+    assert result.data["pixel_y"].max() < bottom
+    for name in functions:
+        points = result.data[result.data["curve_name"] == name]
+        assert points["x"].min() < 0.5
+        assert points["x"].max() > 8.5
+        transient = points[(points["x"] >= 0.2) & (points["x"] <= 1.8)]
+        assert transient["y"].max() - transient["y"].min() > 0.10
+        tail = points[points["x"] > 8.2]
+        assert len(tail) > 10
+    assert any("outside the calibration-anchor rectangle" in warning for warning in result.warnings)
+
+
+def test_logarithmic_interior_anchors_extrapolate_only_within_plot_region():
+    image = Image.new("RGB", (140, 60), "white")
+    plot_region = (10, 10, 130, 50)
+    ImageDraw.Draw(image).line((10, 30, 129, 30), fill=(214, 39, 40), width=1)
+    calibration = AxisCalibration(40, 100, 10, 100, 15, 45, 1, -1, x_scale="log")
+    result = digitize_color_curves(
+        image, crop=(0, 0, 140, 60), plot_region=plot_region, calibration=calibration,
+        colors=[("log-line", (214, 39, 40))], color_tolerance=1,
+    )
+    x_left, _ = calibration.pixel_to_data(40, 30)
+    x_right, _ = calibration.pixel_to_data(100, 30)
+    assert x_left == pytest.approx(10)
+    assert x_right == pytest.approx(100)
+    assert result.data["x"].min() < 10
+    assert result.data["x"].max() > 100
+    assert result.data["pixel_x"].min() == 10
+    assert result.data["pixel_x"].max() == 129
+
+
+def test_digitizer_masks_same_colour_axis_strokes_and_preserves_curve_gaps():
+    from PIL import ImageDraw
+
+    image = Image.new("RGB", (100, 60), "white")
+    draw = ImageDraw.Draw(image)
+    green = (0, 128, 0)
+    draw.line((10, 30, 90, 30), fill=green, width=3)
+    draw.line((50, 10, 50, 50), fill=green, width=3)
+    draw.line((10, 20, 90, 40), fill=green, width=1)
+    calibration = AxisCalibration(10, 90, 0, 8, 10, 50, -1, 1)
+    common = dict(
+        crop=(0, 0, 100, 60), calibration=calibration,
+        colors=[("curve", green)], color_tolerance=1,
+    )
+    contaminated = digitize_color_curves(image, **common)
+    extracted = digitize_color_curves(image, **common, axis_pixels=(30, 50))
+
+    assert extracted.data["pixel_x"].min() == 10
+    assert extracted.data["pixel_x"].max() == 90
+    expected_from_x = lambda pixels: 0.5 - (pixels - 10.0) * 0.0125
+    extracted_error = np.mean(np.abs(extracted.data["y"].to_numpy() - expected_from_x(extracted.data["pixel_x"].to_numpy())))
+    contaminated_error = np.mean(np.abs(contaminated.data["y"].to_numpy() - expected_from_x(contaminated.data["pixel_x"].to_numpy())))
+    assert extracted_error < 0.03
+    assert contaminated_error > 0.15
+    assert not np.isin(extracted.data["pixel_x"], np.arange(48, 53)).any()
+    assert any("detected horizontal and vertical axis" in warning and "not interpolated" in warning for warning in extracted.warnings)
+
+
+def test_digitizer_does_not_mask_differently_coloured_axes():
+    from PIL import ImageDraw
+
+    image = Image.new("RGB", (100, 60), "white")
+    draw = ImageDraw.Draw(image)
+    draw.line((10, 30, 90, 30), fill=(20, 20, 20), width=3)
+    draw.line((50, 10, 50, 50), fill=(20, 20, 20), width=3)
+    draw.line((10, 20, 90, 40), fill=(214, 39, 40), width=1)
+    calibration = AxisCalibration(10, 90, 0, 8, 10, 50, -1, 1)
+    result = digitize_color_curves(
+        image, crop=(0, 0, 100, 60), calibration=calibration,
+        colors=[("curve", (214, 39, 40))], color_tolerance=1,
+        axis_pixels=(30, 50),
+    )
+    assert len(result.data) == 81
+    assert not any("axis; its stroke was masked" in warning for warning in result.warnings)
 
 
 def test_exclusion_rectangle_removes_pixels_preserves_gap_and_data_plot_does_not_bridge_it():
@@ -916,7 +1170,7 @@ def test_legend_or_inset_like_same_color_marks_warn_and_can_be_excluded():
         image, crop=(0, 0, 100, 60), calibration=calibration,
         colors=[("curve", (214, 39, 40))], color_tolerance=1,
     )
-    assert any("legend sample" in warning or "inset may contaminate" in warning for warning in contaminated.warnings)
+    assert any("same-color legend/inset" in warning for warning in contaminated.warnings)
     cleaned = digitize_color_curves(
         image, crop=(0, 0, 100, 60), calibration=calibration,
         colors=[("curve", (214, 39, 40))], color_tolerance=1,
@@ -1039,6 +1293,29 @@ def test_candidate_discovery_returns_ranked_validated_candidates():
     assert all("interpretation" in item.to_dict() for item in candidates)
 
 
+def test_candidate_validation_holds_out_complete_repeated_x_groups():
+    x = np.repeat(np.arange(20, dtype=float), [1 + index % 3 for index in range(20)])
+    validation = _grouped_holdout_mask(x)
+    train_x = set(x[~validation])
+    validation_x = set(x[validation])
+
+    assert validation.any() and (~validation).any()
+    assert not train_x.intersection(validation_x)
+    assert validation_x == {0.0, 5.0, 10.0, 15.0}
+
+
+def test_damped_candidate_initialization_uses_observed_peak_spacing_and_decay():
+    x = np.linspace(0.1, 9.0, 1800)
+    expected = {"amplitude": 0.12, "decay": 0.9, "frequency": 22.0, "phase": 0.4, "equilibrium": 0.2}
+    y = expected["equilibrium"] + expected["amplitude"] * np.exp(-expected["decay"] * x) * np.sin(expected["frequency"] * x + expected["phase"])
+    amplitude, decay, frequency, phase, equilibrium = _estimate_oscillation_initials(x, y)
+    assert frequency == pytest.approx(expected["frequency"], rel=0.05)
+    assert decay == pytest.approx(expected["decay"], rel=0.2)
+    assert amplitude == pytest.approx(expected["amplitude"], rel=0.3)
+    assert equilibrium == pytest.approx(expected["equilibrium"], abs=0.002)
+    assert np.isfinite(phase)
+
+
 def test_candidate_discovery_rejects_families_invalid_on_held_out_domain():
     x = np.linspace(0.0, 5.0, 40)
     y = 2.0 * x + 1.0
@@ -1058,6 +1335,7 @@ def test_metadata_csv_figures_and_fit_exports_are_reproducible(tmp_path: Path):
     assert metadata["status"] == "DIGITIZED"
     assert metadata["experiment_id"] == "digitization-run"
     assert metadata["axis_calibration_provenance"] == "USER_PROVIDED"
+    assert metadata["extraction_plot_region_pixels"] == {"left": crop[0], "top": crop[1], "right": crop[2], "bottom": crop[3]}
     assert metadata["exclusion_regions_pixels"][0]["right"] == int(crop[0]) + 1
     assert "not interpolated" in metadata["exclusion_policy"]
     assert artifacts["long_csv"].is_file() and artifacts["wide_csv"].is_file()

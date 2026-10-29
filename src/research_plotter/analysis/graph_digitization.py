@@ -1,8 +1,10 @@
 """Conservative pixel-to-data extraction for scientific graph images.
 
 Digitized values are estimates from pixels, not recovered source observations.
-The user supplies the plot bounds and axis calibration; colored curves are
-segmented independently and reduced to one median pixel position per column.
+The selected plot region bounds extraction; independent axis calibration
+anchors define the coordinate transform and may be interior ticks. Colored
+curves are segmented independently and resolvable vertical clusters per image
+column are retained rather than collapsed into a potentially false median.
 """
 
 from __future__ import annotations
@@ -123,7 +125,8 @@ class DigitizationResult:
     data: pd.DataFrame
     curve_names: tuple[str, ...]
     warnings: tuple[str, ...]
-    extraction_method: str = "RGB color-distance segmentation; median y pixel per x column"
+    extraction_method: str = "RGB color-distance segmentation; separate vertical pixel clusters per x column"
+    plot_region_pixels: tuple[int, int, int, int] | None = None
 
 
 def _interpolate_axis(fraction: np.ndarray, minimum: float, maximum: float, scale: ImageScale) -> np.ndarray:
@@ -316,16 +319,37 @@ def digitize_color_curves(
     image: Image.Image,
     *,
     crop: tuple[int, int, int, int],
+    plot_region: tuple[int, int, int, int] | None = None,
     calibration: AxisCalibration,
     colors: list[tuple[str, tuple[int, int, int]]],
     color_tolerance: float = 62.0,
     max_points: int | None = None,
     exclusion_regions: Sequence[tuple[int, int, int, int]] = (),
+    axis_pixels: tuple[float | None, float | None] | None = None,
+    axis_mask_half_width_px: int = 2,
 ) -> DigitizationResult:
-    """Digitize each selected color independently, preserving source pixels."""
+    """Digitize selected colors, optionally masking same-color detected axes.
+
+    ``crop`` is the image area being inspected; ``plot_region`` is the selected
+    extraction rectangle within that area. If omitted, the crop is the plot
+    region. Calibration anchors map pixels to values but never clip the region.
+
+    ``axis_pixels`` contains the horizontal-axis y coordinate and vertical-axis
+    x coordinate in original-image pixels. A mask is applied only when the
+    selected curve color has substantial support along that detected line, so
+    differently colored data curves keep their axis-crossing points.
+    """
     left, top, right, bottom = validate_crop(image.size, crop)
+    # ``crop`` selects the source pixels to inspect. ``plot_region`` is the
+    # explicit rectangle inside that crop from which curve observations may
+    # be extracted. Calibration anchors are references for a coordinate
+    # transform; they are deliberately not extraction bounds.
+    plot_region = validate_crop(image.size, plot_region or crop)
+    plot_left, plot_top, plot_right, plot_bottom = plot_region
+    if not (left <= plot_left < plot_right <= right and top <= plot_top < plot_bottom <= bottom):
+        raise ValueError("The selected plot region must lie inside the image-analysis crop")
     exclusion_regions = validate_exclusion_regions(image.size, crop, exclusion_regions)
-    calibration.validate_image_bounds(image.size, crop)
+    calibration.validate_image_bounds(image.size, plot_region)
     if not colors:
         raise ValueError("Select at least one curve color before digitizing")
     names = [name.strip() for name, _ in colors]
@@ -337,6 +361,16 @@ def digitize_color_curves(
         raise ValueError("Color tolerance must be greater than 0 and no more than 255")
     if max_points is not None and max_points < 3:
         raise ValueError("A point limit must be at least 3")
+    if not isinstance(axis_mask_half_width_px, int) or not 0 <= axis_mask_half_width_px <= 10:
+        raise ValueError("Axis-mask half width must be an integer from 0 to 10 pixels")
+    if axis_pixels is not None:
+        if len(axis_pixels) != 2 or any(value is not None and not np.isfinite(value) for value in axis_pixels):
+            raise ValueError("Detected axis coordinates must be finite original-image pixels or None")
+        horizontal_axis_y, vertical_axis_x = axis_pixels
+        if horizontal_axis_y is not None and not top <= horizontal_axis_y < bottom:
+            raise ValueError("Detected horizontal axis must lie inside the selected crop")
+        if vertical_axis_x is not None and not left <= vertical_axis_x < right:
+            raise ValueError("Detected vertical axis must lie inside the selected crop")
     for name, color in colors:
         if len(color) != 3 or any(not isinstance(channel, (int, np.integer)) or not 0 <= channel <= 255 for channel in color):
             raise ValueError(f"Curve color for {name!r} must be an RGB triplet with channels from 0 to 255")
@@ -350,27 +384,53 @@ def digitize_color_curves(
         region = region_pixels
         distance = np.sqrt(np.sum((region - target) ** 2, axis=2))
         mask = distance <= color_tolerance
-        # Pixel color matches outside the calibrated axes can be labels, a
-        # legend, or an inset. Exclude them before aggregation so calibration
-        # is never silently extrapolated onto unrelated image regions.
-        plot_left = max(left, int(np.ceil(calibration.x_left_px)))
-        plot_right = min(right, int(np.floor(calibration.x_right_px)) + 1)
-        plot_top = max(top, int(np.ceil(calibration.y_top_px)))
-        plot_bottom = min(bottom, int(np.floor(calibration.y_bottom_px)) + 1)
-        if plot_right <= plot_left or plot_bottom <= plot_top:
-            raise ValueError("Calibrated axis pixel bounds do not overlap the selected crop")
+        # Only the user's/detector's selected plot-region rectangle restricts
+        # extraction. Calibration may use interior ticks and can be evaluated
+        # outside those anchors, but never outside this selected image region.
         x_indices = np.arange(left, right)
         y_indices = np.arange(top, bottom)
         mask &= (x_indices[None, :] >= plot_left) & (x_indices[None, :] < plot_right)
         mask &= (y_indices[:, None] >= plot_top) & (y_indices[:, None] < plot_bottom)
         removed_pixels = 0
+        masked_axes: list[str] = []
+        if axis_pixels is not None:
+            horizontal_axis_y, vertical_axis_x = axis_pixels
+            if horizontal_axis_y is not None and axis_mask_half_width_px:
+                local_axis_y = int(round(horizontal_axis_y - top))
+                search_radius = max(axis_mask_half_width_px + 2, 4)
+                plot_local_top, plot_local_bottom = plot_top - top, plot_bottom - top
+                candidates = range(max(plot_local_top, local_axis_y - search_radius), min(plot_local_bottom, local_axis_y + search_radius + 1))
+                best_row = max(candidates, key=lambda row: int(mask[row, :].sum()), default=local_axis_y)
+                required_support = max(8, int((plot_right - plot_left) * 0.04))
+                if 0 <= best_row < mask.shape[0] and int(mask[best_row, :].sum()) >= required_support:
+                    row_slice = slice(max(0, best_row - axis_mask_half_width_px), min(mask.shape[0], best_row + axis_mask_half_width_px + 1))
+                    removed_pixels += int(mask[row_slice, :].sum())
+                    mask[row_slice, :] = False
+                    masked_axes.append("horizontal")
+            if vertical_axis_x is not None and axis_mask_half_width_px:
+                local_axis_x = int(round(vertical_axis_x - left))
+                search_radius = max(axis_mask_half_width_px + 2, 4)
+                plot_local_left, plot_local_right = plot_left - left, plot_right - left
+                candidates = range(max(plot_local_left, local_axis_x - search_radius), min(plot_local_right, local_axis_x + search_radius + 1))
+                best_column = max(candidates, key=lambda column: int(mask[:, column].sum()), default=local_axis_x)
+                required_support = max(8, int((plot_bottom - plot_top) * 0.04))
+                if 0 <= best_column < mask.shape[1] and int(mask[:, best_column].sum()) >= required_support:
+                    column_slice = slice(max(0, best_column - axis_mask_half_width_px), min(mask.shape[1], best_column + axis_mask_half_width_px + 1))
+                    removed_pixels += int(mask[:, column_slice].sum())
+                    mask[:, column_slice] = False
+                    masked_axes.append("vertical")
+        if masked_axes:
+            warnings.append(
+                f"{name}: the selected color also matches the detected {' and '.join(masked_axes)} axis; its stroke was masked to avoid contaminating the curve. "
+                "Curve crossings may become gaps, and missing points are not interpolated."
+            )
         for ex_left, ex_top, ex_right, ex_bottom in exclusion_regions:
             x_slice = slice(ex_left - left, ex_right - left)
             y_slice = slice(ex_top - top, ex_bottom - top)
             excluded_pixels = mask[y_slice, x_slice]
             removed_pixels += int(excluded_pixels.sum())
             mask[y_slice, x_slice] = False
-        if removed_pixels:
+        if removed_pixels and exclusion_regions:
             warnings.append(
                 f"{name}: exclusion region(s) removed {removed_pixels} matching pixels. "
                 "If an exclusion crosses this curve it creates a data gap; missing points are not interpolated."
@@ -395,22 +455,53 @@ def digitize_color_curves(
         suspicious_columns = int(np.count_nonzero(vertical_spread >= max(7.0, region_pixels.shape[0] * 0.02)))
         if suspicious_columns:
             warnings.append(
-                f"{name}: {suspicious_columns} x-column(s) contain multiple vertically spread matching pixels that are reduced to one median y value. "
-                "Overlapping curves, a legend sample, annotation, or inset may contaminate that estimate; review the pixel overlay or add an exclusion region before fitting."
+                f"{name}: {suspicious_columns} x-column(s) contain vertically spread matching pixels. "
+                "The digitizer separates distinct vertical pixel clusters, but overlapping branches, same-color legend/inset marks, or unrelated annotations can still be ambiguous; review the pixel overlay or add an exclusion region before fitting."
             )
-        median_y = np.asarray(
-            [np.median(sorted_y[start:end]) for start, end in zip(group_starts, group_ends)],
-            dtype=float,
-        )
-        column_coverage = len(unique_x) / max(1.0, calibration.x_right_px - calibration.x_left_px)
-        data_x, data_y = calibration.pixel_to_data(unique_x.astype(float), median_y)
+        # A fast oscillatory trace can cross the same one-pixel-wide x column
+        # at multiple y positions. Reducing all matching pixels in that
+        # column to one median creates a fictitious midline and destroys the
+        # transient. Preserve separate vertical clusters as separate samples;
+        # close/merged strokes remain subject to raster-resolution limits.
+        sample_x: list[float] = []
+        sample_y: list[float] = []
+        cluster_gap_px = 2
+        for x_pixel, start, end in zip(unique_x, group_starts, group_ends):
+            column_y = np.sort(sorted_y[start:end])
+            cluster_starts = np.r_[0, np.flatnonzero(np.diff(column_y) > cluster_gap_px) + 1]
+            cluster_ends = np.r_[cluster_starts[1:], len(column_y)]
+            for cluster_start, cluster_end in zip(cluster_starts, cluster_ends):
+                cluster = column_y[cluster_start:cluster_end]
+                sample_x.append(float(x_pixel))
+                sample_y.append(float(np.median(cluster)))
+        sample_x_array = np.asarray(sample_x, dtype=float)
+        sample_y_array = np.asarray(sample_y, dtype=float)
+        if len(sample_x_array) > len(unique_x):
+            warnings.append(
+                f"{name}: separate branches or overlapping marks occur in the same image columns; all resolvable vertical clusters were retained as separate observations. "
+                "Their exact sub-pixel x positions cannot be recovered from this raster."
+            )
+        column_coverage = len(unique_x) / max(1.0, plot_right - plot_left)
+        data_x, data_y = calibration.pixel_to_data(sample_x_array, sample_y_array)
         valid = np.isfinite(data_x) & np.isfinite(data_y)
         if not valid.all():
             warnings.append(f"{name}: non-finite calibrated points were discarded")
+        if not valid.any():
+            warnings.append(f"{name}: all matched pixels mapped to non-finite coordinates and were discarded")
+            continue
+        if (
+            np.min(sample_x_array[valid]) < calibration.x_left_px
+            or np.max(sample_x_array[valid]) > calibration.x_right_px
+            or np.min(sample_y_array[valid]) < calibration.y_top_px
+            or np.max(sample_y_array[valid]) > calibration.y_bottom_px
+        ):
+            warnings.append(
+                f"{name}: some extracted points lie outside the calibration-anchor rectangle. Their coordinates use the calibrated linear/log mapping extrapolated within the selected plot region; review edge values."
+            )
         curve = pd.DataFrame({
             "curve_name": name,
-            "pixel_x": unique_x[valid].astype(float),
-            "pixel_y": median_y[valid],
+            "pixel_x": sample_x_array[valid],
+            "pixel_y": sample_y_array[valid],
             "x": np.asarray(data_x)[valid],
             "y": np.asarray(data_y)[valid],
         }).sort_values("x", kind="stable")
@@ -430,7 +521,7 @@ def digitize_color_curves(
     if not rows:
         raise ValueError("No curve pixels were extracted. Adjust the crop, selected color, or color tolerance.")
     frame = pd.concat(rows, ignore_index=True)
-    return DigitizationResult(data=frame, curve_names=tuple(names), warnings=tuple(warnings))
+    return DigitizationResult(data=frame, curve_names=tuple(names), warnings=tuple(warnings), plot_region_pixels=plot_region)
 
 
 def long_to_wide(data: pd.DataFrame) -> pd.DataFrame:

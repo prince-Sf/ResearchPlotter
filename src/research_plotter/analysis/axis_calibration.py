@@ -114,6 +114,16 @@ class _AxisFit:
     inlier_count: int
 
 
+@dataclass(frozen=True)
+class _LocalTickRead:
+    """One OCR interpretation with a crop-relative text bounding box."""
+
+    text: str
+    value: float | None
+    confidence: float
+    box: tuple[float, float, float, float] | None = None
+
+
 _PI_LABEL = re.compile(r"^(?P<sign>[+-]?)(?P<num>\d*(?:\.\d+)?)?(?:π|pi)(?:/(?P<den>\d+(?:\.\d+)?))?$", re.IGNORECASE)
 _FRACTION = re.compile(r"^(?P<num>[+-]?\d+)\s*/\s*(?P<den>\d+)$")
 _POWER_OF_TEN = re.compile(r"^(?P<base>[+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*(?:×|x|\*)?\s*10\s*\^\s*(?P<exp>[+-]?\d+)$", re.IGNORECASE)
@@ -1025,8 +1035,8 @@ def _otsu_threshold(image: Image.Image) -> int:
 
 def _read_local_tick_label(
     image: Image.Image, box: tuple[int, int, int, int]
-) -> list[tuple[str, float | None, float]]:
-    """Read a crop with local Tesseract modes and retain OCR confidence."""
+) -> list[_LocalTickRead]:
+    """Read a crop with local Tesseract modes, confidence, and text geometry."""
     available, _ = local_ocr_available()
     if not available:
         return []
@@ -1043,43 +1053,69 @@ def _read_local_tick_label(
     gray = ImageEnhance.Contrast(gray).enhance(1.1)
     scale = min(4, max(3, int(round(360 / max(1, min(gray.size))))))
     enlarged = gray.resize((gray.width * scale, gray.height * scale), Image.Resampling.LANCZOS)
-    candidates: list[tuple[str, float | None, float]] = []
+    candidates: list[_LocalTickRead] = []
+
+    def append_ocr_candidates(data: dict[str, object], resize_scale: int) -> None:
+        line_words: dict[
+            tuple[int, int, int],
+            list[tuple[float, str, float, tuple[float, float, float, float]]],
+        ] = {}
+        confidences: list[float] = []
+        for index, raw_text in enumerate(data.get("text", [])):
+            token = str(raw_text).strip()
+            try:
+                confidence = float(data["conf"][index])
+                line_key = (
+                    int(data.get("block_num", [0])[index]),
+                    int(data.get("par_num", [0])[index]),
+                    int(data.get("line_num", [index])[index]),
+                )
+                token_left = float(data["left"][index]) / resize_scale
+                token_top = float(data["top"][index]) / resize_scale
+                token_right = token_left + float(data["width"][index]) / resize_scale
+                token_bottom = token_top + float(data["height"][index]) / resize_scale
+            except (KeyError, TypeError, ValueError, IndexError):
+                continue
+            if token and confidence >= 0 and token_right > token_left and token_bottom > token_top:
+                token_box = (token_left, token_top, token_right, token_bottom)
+                line_words.setdefault(line_key, []).append((token_left, token, confidence, token_box))
+                confidences.append(confidence)
+        ordered_lines = [
+            " ".join(token for _, token, _, _ in sorted(line_words[key]))
+            for key in sorted(line_words)
+        ]
+        raw_text = "\n".join(ordered_lines)
+        all_boxes = [box for line in line_words.values() for _, _, _, box in line]
+        text_box = (
+            (
+                min(item[0] for item in all_boxes),
+                min(item[1] for item in all_boxes),
+                max(item[2] for item in all_boxes),
+                max(item[3] for item in all_boxes),
+            )
+            if all_boxes else None
+        )
+        confidence = float(np.mean(confidences)) if confidences else 0.0
+        parsed = _parse_local_tick_text(raw_text)
+        candidates.append(_LocalTickRead(raw_text, parsed[1] if parsed else None, confidence, text_box))
+        if parsed:
+            candidates.append(_LocalTickRead(parsed[0], parsed[1], confidence, text_box))
+
     languages = ["eng+script/Greek", "eng"]
     for language in languages:
-        for page_mode in (6, 8, 13):
+        # PSM 7/10 help with isolated one-line numeric labels. They are
+        # especially useful when an axis arrow or curve touches the label row:
+        # block/sparse modes can merge the text with that geometry, while a
+        # line/single-character mode often recovers the actual printed digits.
+        page_modes = (6, 8, 13, 7, 10) if language == "eng" else (6, 8, 13)
+        for page_mode in page_modes:
             try:
                 data = pytesseract.image_to_data(
                     enlarged, lang=language, config=f"--psm {page_mode}", output_type=Output.DICT
                 )
             except Exception:
                 continue
-            line_words: dict[tuple[int, int, int], list[tuple[float, str, float]]] = {}
-            confidences: list[float] = []
-            for index, raw_text in enumerate(data.get("text", [])):
-                token = str(raw_text).strip()
-                try:
-                    confidence = float(data["conf"][index])
-                    line_key = (
-                        int(data.get("block_num", [0])[index]),
-                        int(data.get("par_num", [0])[index]),
-                        int(data.get("line_num", [index])[index]),
-                    )
-                    token_x = float(data["left"][index]) / scale
-                except (KeyError, TypeError, ValueError, IndexError):
-                    continue
-                if token and confidence >= 0:
-                    line_words.setdefault(line_key, []).append((token_x, token, confidence))
-                    confidences.append(confidence)
-            ordered_lines = [
-                " ".join(token for _, token, _ in sorted(line_words[key]))
-                for key in sorted(line_words)
-            ]
-            raw_text = "\n".join(ordered_lines)
-            parsed = _parse_local_tick_text(raw_text)
-            confidence = float(np.mean(confidences)) if confidences else 0.0
-            candidates.append((raw_text, parsed[1] if parsed else None, confidence))
-            if parsed:
-                candidates.append((parsed[0], parsed[1], confidence))
+            append_ocr_candidates(data, scale)
     # Binarized single-label crops can retain a faint zero or minus sign that
     # full-color OCR loses. Keep these as additional evidence, not a forced
     # interpretation of the label.
@@ -1097,32 +1133,7 @@ def _read_local_tick_label(
             )
         except Exception:
             continue
-        line_words: dict[tuple[int, int, int], list[tuple[float, str, float]]] = {}
-        confidences: list[float] = []
-        for index, raw_text in enumerate(data.get("text", [])):
-            token = str(raw_text).strip()
-            try:
-                confidence = float(data["conf"][index])
-                line_key = (
-                    int(data.get("block_num", [0])[index]),
-                    int(data.get("par_num", [0])[index]),
-                    int(data.get("line_num", [index])[index]),
-                )
-                token_x = float(data["left"][index]) / binary_scale
-            except (KeyError, TypeError, ValueError, IndexError):
-                continue
-            if token and confidence >= 0:
-                line_words.setdefault(line_key, []).append((token_x, token, confidence))
-                confidences.append(confidence)
-        raw_text = "\n".join(
-            " ".join(token for _, token, _ in sorted(line_words[key]))
-            for key in sorted(line_words)
-        )
-        parsed = _parse_local_tick_text(raw_text)
-        confidence = float(np.mean(confidences)) if confidences else 0.0
-        candidates.append((raw_text, parsed[1] if parsed else None, confidence))
-        if parsed:
-            candidates.append((parsed[0], parsed[1], confidence))
+        append_ocr_candidates(data, binary_scale)
     return candidates
 
 
@@ -1409,7 +1420,11 @@ def _tick_crop_boxes(
     if axis == "x":
         font_height = float(np.median([word.bottom - word.top for word in selected])) if selected else max(8.0, (bottom - top) * 0.035)
         width = max(int(font_height * 3.4), int(spacing * 0.34), 40)
-        width = min(width, max(40, int((right - left) * 0.20)))
+        # Do not let a tall OCR box (often enlarged by an adjacent curve or
+        # axis arrow) make the retry crop swallow neighbouring labels or the
+        # axis-end annotation. The observed tick spacing is a better bound on
+        # one label's width than the full image width.
+        width = min(width, max(40, int(spacing * 0.9)), max(40, int((right - left) * 0.20)))
         center = float(np.median([(word.left + word.right) / 2 for word in selected])) if selected else pixel
         x0, x1 = max(left, int(round(center - width / 2))), min(right, int(round(center + width / 2)))
         label_extent = min(max(int(spacing * 0.34), int(font_height * 3.0), 40), max(40, int((bottom - top) * 0.12)))
@@ -1463,9 +1478,70 @@ def _direct_tick_values(words: Sequence[OCRWord]) -> list[tuple[str, float, floa
     return results
 
 
+def _origin_zero_candidates(
+    words: Sequence[OCRWord],
+    horizontal: AxisLine,
+    vertical: AxisLine,
+    crop: tuple[int, int, int, int],
+) -> tuple[TickLabel, ...]:
+    """Represent a printed O/Omicron at an axis crossing as a reviewable zero.
+
+    Some plots label the origin with the letter ``O`` rather than the digit
+    zero. The glyph alone is ambiguous, so this is only a candidate when its
+    OCR box is immediately adjacent to the detected axis intersection. It is
+    never parsed as zero globally and remains review-required until the other
+    tick anchors support the mapping.
+    """
+    left, top, right, bottom = crop
+    tolerance = max(12.0, min(32.0, min(right - left, bottom - top) * 0.035))
+    candidates: list[OCRWord] = []
+    for word in words:
+        label = re.sub(r"[\s.,:;|]+", "", word.text)
+        if label not in {"O", "o", "Ο", "ο"}:
+            continue
+        dx = max(word.left - vertical.pixel, 0.0, vertical.pixel - word.right)
+        dy = max(word.top - horizontal.pixel, 0.0, horizontal.pixel - word.bottom)
+        if dx <= tolerance and dy <= tolerance:
+            candidates.append(word)
+    if not candidates:
+        return ()
+    word = max(candidates, key=lambda item: item.confidence)
+    note = "The OCR glyph O/omicron is adjacent to the axis intersection and is proposed as zero; confirm this interpretation against the image."
+    return (
+        TickLabel("x", float(vertical.pixel), word.text, 0.0, word.confidence, "REVIEW_REQUIRED", "0 (origin-label context)", note),
+        TickLabel("y", float(horizontal.pixel), word.text, 0.0, word.confidence, "REVIEW_REQUIRED", "0 (origin-label context)", note),
+    )
+
+
 def _looks_like_lost_decimal(text: str) -> bool:
     """Flag leading-zero OCR integers for a targeted retry, not reinterpretation."""
     return bool(re.fullmatch(r"0\d+", str(text).strip()))
+
+
+def _degree_suffix_candidate(text: str, *, degree_context: bool) -> tuple[str, float] | None:
+    """Suggest a review-only degree reading when OCR turns ``°`` into 0/5.
+
+    The unmodified reading is always retained. This alternative is only
+    offered on axes where another printed label established degree notation;
+    the axis-wide tick fit must independently corroborate it before it can be
+    accepted. Thus a legitimate value such as 2705 remains available as-is.
+    """
+    if not degree_context:
+        return None
+    normalized = str(text).strip().replace("−", "-").replace("–", "-").replace("—", "-")
+    normalized = re.sub(r"\s+", "", normalized)
+    match = re.fullmatch(r"(?P<base>[+-]?\d+)(?P<suffix>[05])", normalized)
+    if match is None:
+        return None
+    candidate_text = f"{match.group('base')}°"
+    value = parse_tick_label(candidate_text)
+    return (candidate_text, value) if value is not None else None
+
+
+def _has_leading_minus_evidence(text: str) -> bool:
+    """Recognize a minus glyph adjacent to digits in the isolated OCR label."""
+    normalized = str(text).replace("−", "-").replace("–", "-").replace("—", "-")
+    return bool(re.search(r"-\s*\d", normalized))
 
 
 def _tick_labels_from_axis_geometry(
@@ -1514,8 +1590,17 @@ def _tick_labels_from_axis_geometry(
         if vertical.start <= center_y <= vertical.end and 2 <= abs(center_x - vertical.pixel) <= y_band:
             if not y_pixels or min(abs(center_y - item) for item in y_pixels) > y_tolerance:
                 y_pixels.append(_snap_text_center_to_inferred_tick(center_y, y_stroke_pixels))
-    x_pixels = _merge_tick_pixels(x_pixels, tolerance=max(4.0, min(10.0, min(width, height) * 0.009)))
-    y_pixels = _merge_tick_pixels(y_pixels, tolerance=max(4.0, min(10.0, min(width, height) * 0.009)))
+    # OCR passes can return overlapping boxes for one printed label with
+    # slightly different edges/centres. Merge those duplicates using a bound
+    # derived from the observed local tick spacing and image size. The
+    # spacing-relative cap keeps distinct nearby ticks separate on dense axes.
+    x_spacing = _median_tick_spacing(x_pixels, width / 5)
+    y_spacing = _median_tick_spacing(y_pixels, height / 4)
+    merge_limit = min(24.0, min(width, height) * 0.06)
+    x_merge_tolerance = max(4.0, min(merge_limit, x_spacing * 0.22))
+    y_merge_tolerance = max(4.0, min(merge_limit, y_spacing * 0.22))
+    x_pixels = _merge_tick_pixels(x_pixels, tolerance=x_merge_tolerance)
+    y_pixels = _merge_tick_pixels(y_pixels, tolerance=y_merge_tolerance)
     # A colored curve may cover one short tick mark. Fill only gaps supported
     # by the repeated spacing of at least four independently detected ticks;
     # the inferred position remains a candidate until its own label is read.
@@ -1528,6 +1613,7 @@ def _tick_labels_from_axis_geometry(
     y_side = _axis_label_side(words, y_pixels, axis="y", axis_line=vertical, along_tolerance=y_tolerance, across_tolerance=y_band)
     all_reviews: list[TickLabel] = []
     corrected_pi_alias = False
+    foreground = _foreground_mask(image, crop)
 
     def labels_for_axis(axis: Literal["x", "y"], pixels: Sequence[float], spacing: float, along_tolerance: float, across_tolerance: float, side: int, axis_line: AxisLine, cross_axis: AxisLine) -> tuple[TickLabel, ...]:
         nonlocal corrected_pi_alias
@@ -1574,37 +1660,83 @@ def _tick_labels_from_axis_geometry(
             low_degree_read = degree_context and confidence < 60
             needs_retry = not unique_direct or stacked or lost_decimal or shifted_pi or coefficient_pi or missing_degree_marker or low_degree_read
 
-            local_options: list[tuple[str, float | None, float]] = []
+            local_options: list[_LocalTickRead] = []
             if needs_retry:
                 tight_box, broad_box = _tick_crop_boxes(
                     image, crop, axis=axis, pixel=pixel, axis_line=axis_line,
                     cross_axis=cross_axis, side=side, words=selected, spacing=spacing,
                 )
+                oversized_tight_box = bool(
+                    tight_box is not None and broad_box is not None and (
+                        tight_box[2] - tight_box[0] > (broad_box[2] - broad_box[0]) * 1.5
+                        or tight_box[3] - tight_box[1] > (broad_box[3] - broad_box[1]) * 1.5
+                    )
+                )
                 boxes = (
-                    (tight_box, broad_box if (axis == "x" and (stacked or coefficient_pi)) else None)
+                    (
+                        tight_box,
+                        broad_box if (
+                            axis == "x" and (stacked or coefficient_pi or oversized_tight_box)
+                        ) else None,
+                    )
                     if selected else (broad_box,)
                 )
                 for box in boxes:
                     if box is not None:
-                        local_options.extend(_read_local_tick_label(image, box))
+                        for item in _read_local_tick_label(image, box):
+                            # Retain compatibility with small injected OCR
+                            # adapters used by callers/tests that return the
+                            # earlier three-field tuple form.
+                            if isinstance(item, _LocalTickRead):
+                                label, value, local_confidence, local_box = item.text, item.value, item.confidence, item.box
+                            else:
+                                label, value, local_confidence = item
+                                local_box = None
+                            absolute_box = (
+                                (
+                                    local_box[0] + box[0], local_box[1] + box[1],
+                                    local_box[2] + box[0], local_box[3] + box[1],
+                                ) if local_box is not None else None
+                            )
+                            local_options.append(_LocalTickRead(label, value, local_confidence, absolute_box))
 
-            parsed_local = [item for item in local_options if item[1] is not None]
+            has_pi_evidence = bool(pi_tokens or re.search(r"π|\\pi|\bpi\b", raw_label, re.IGNORECASE))
+            parsed_local = [
+                item for item in local_options
+                if item.value is not None and not (
+                    degree_context
+                    and not has_pi_evidence
+                    and re.search(r"π|Π|\\pi|\bpi\b", item.text, re.IGNORECASE)
+                )
+            ]
             chosen_label: str | None = None
             chosen_value: float | None = None
             chosen_confidence = confidence
+            refined_pixel = float(pixel)
             if parsed_local:
-                has_pi_evidence = bool(pi_tokens or re.search(r"π|\\pi|\bpi\b", raw_label, re.IGNORECASE))
                 # A locally isolated mathematical expression outranks a
                 # fragmented full-page read (e.g. π and 2 as separate lines).
                 # Prefer a recognized fraction when OCR returned both a
                 # compact and a multiline candidate for the same tick.
-                def local_rank(item: tuple[str, float | None, float]) -> tuple[int, int, float]:
-                    label, value, conf = item
-                    contains_pi = bool(re.search(r"π|\\pi|\bpi\b", label, re.IGNORECASE))
-                    fraction = "/" in label or "\n" in label
-                    return (int(has_pi_evidence and contains_pi), int(fraction), conf)
+                def local_rank(item: _LocalTickRead) -> tuple[int, int, float]:
+                    contains_pi = bool(re.search(r"π|\\pi|\bpi\b", item.text, re.IGNORECASE))
+                    fraction = contains_pi and ("/" in item.text or "\n" in item.text)
+                    return (
+                        int(has_pi_evidence and contains_pi),
+                        int(has_pi_evidence and fraction),
+                        item.confidence,
+                    )
                 best = max(parsed_local, key=local_rank)
-                chosen_label, chosen_value, chosen_confidence = best
+                chosen_label, chosen_value, chosen_confidence = best.text, best.value, best.confidence
+                if best.box is not None:
+                    text_center = (
+                        (best.box[0] + best.box[2]) / 2
+                        if axis == "x" else (best.box[1] + best.box[3]) / 2
+                    )
+                    refined_pixel = _snap_to_tick(
+                        foreground, axis=axis, approximate_pixel=text_center,
+                        axis_pixel=axis_line.pixel, crop=crop,
+                    )
             elif unique_direct and direct:
                 chosen_label, chosen_value, chosen_confidence = max(direct, key=lambda item: item[2])
             else:
@@ -1638,17 +1770,60 @@ def _tick_labels_from_axis_geometry(
             # global axis fit can then select among observed OCR alternatives
             # using the other tick positions; it never synthesizes a missing
             # digit or substitutes a value from the curve shape.
-            candidate_options: dict[float, tuple[str, float]] = {}
-            for candidate_label, candidate_value, candidate_confidence in (*direct, *parsed_local):
+            candidate_options: dict[float, tuple[str, float, float]] = {}
+            degree_alternatives: set[float] = set()
+            minus_alternatives: set[float] = set()
+            leading_minus_evidence = _has_leading_minus_evidence(raw_label)
+
+            def add_candidate(candidate_label: str, candidate_value: float | None, candidate_confidence: float) -> None:
                 if candidate_value is None or not math.isfinite(candidate_value):
-                    continue
+                    return
                 key = round(float(candidate_value), 12)
                 previous = candidate_options.get(key)
                 if previous is None or candidate_confidence > previous[1]:
-                    candidate_options[key] = (candidate_label, float(candidate_confidence))
-            candidate_options.setdefault(round(float(chosen_value), 12), (chosen_label or label_for_review, float(chosen_confidence)))
+                    candidate_options[key] = (candidate_label, float(candidate_confidence), refined_pixel)
+                degree_candidate = _degree_suffix_candidate(candidate_label, degree_context=degree_context)
+                if degree_candidate is not None:
+                    alternate_label, alternate_value = degree_candidate
+                    alternate_key = round(float(alternate_value), 12)
+                    degree_alternatives.add(alternate_key)
+                    previous_alternate = candidate_options.get(alternate_key)
+                    review_label = f"{alternate_label} candidate from OCR {candidate_label!r}"
+                    if previous_alternate is None or candidate_confidence > previous_alternate[1]:
+                        candidate_options[alternate_key] = (review_label, float(candidate_confidence), refined_pixel)
+                    # Full-page OCR may retain a leading minus while isolated
+                    # OCR reads the digits but drops that glyph (for example,
+                    # a local ``1800`` read beside a full-page ``-18...``).
+                    # Combine those observations only as another review-only
+                    # candidate; the independent axis fit must corroborate it.
+                    if leading_minus_evidence and alternate_value > 0:
+                        negative_alternate = -float(alternate_value)
+                        negative_key = round(negative_alternate, 12)
+                        degree_alternatives.add(negative_key)
+                        minus_alternatives.add(negative_key)
+                        previous_negative = candidate_options.get(negative_key)
+                        review_label = f"-{alternate_label} candidate from the visible minus glyph and OCR {candidate_label!r}"
+                        if previous_negative is None or candidate_confidence > previous_negative[1]:
+                            candidate_options[negative_key] = (review_label, float(candidate_confidence), refined_pixel)
+                if leading_minus_evidence and candidate_value > 0:
+                    negative_value = -float(candidate_value)
+                    negative_key = round(negative_value, 12)
+                    minus_alternatives.add(negative_key)
+                    previous_negative = candidate_options.get(negative_key)
+                    review_label = f"-{candidate_label} candidate from the visible minus glyph"
+                    if previous_negative is None or candidate_confidence > previous_negative[1]:
+                        candidate_options[negative_key] = (review_label, float(candidate_confidence), refined_pixel)
+
+            for candidate_label, candidate_value, candidate_confidence in direct:
+                add_candidate(candidate_label, candidate_value, candidate_confidence)
+            for candidate in parsed_local:
+                add_candidate(candidate.text, candidate.value, candidate.confidence)
+            candidate_options.setdefault(
+                round(float(chosen_value), 12),
+                (chosen_label or label_for_review, float(chosen_confidence), refined_pixel),
+            )
             multiple_interpretations = len(candidate_options) > 1
-            for candidate_value, (candidate_label, candidate_confidence) in candidate_options.items():
+            for candidate_value, (candidate_label, candidate_confidence, candidate_pixel) in candidate_options.items():
                 differs_from_primary = not math.isclose(candidate_value, float(chosen_value), rel_tol=1e-10, abs_tol=1e-10)
                 candidate_status: Literal["ACCEPTED", "REVIEW_REQUIRED", "REJECTED"] = (
                     "REVIEW_REQUIRED" if suspicious or multiple_interpretations or differs_from_primary else "ACCEPTED"
@@ -1656,14 +1831,39 @@ def _tick_labels_from_axis_geometry(
                 candidate_note = note
                 if multiple_interpretations and not candidate_note:
                     candidate_note = "OCR returned multiple numerical readings for this tick; the axis-wide mapping must corroborate one interpretation."
+                if round(candidate_value, 12) in degree_alternatives and round(candidate_value, 12) in minus_alternatives:
+                    candidate_note = (
+                        "The degree suffix and leading minus were recovered from separate OCR evidence; this combined reading is only an alternative and was accepted only because multiple axis anchors support it. Verify it against the image."
+                    )
+                elif round(candidate_value, 12) in degree_alternatives:
+                    candidate_note = (
+                        "The final OCR character may be a degree symbol; this is an alternative reading only and was retained because other labels establish degree notation. "
+                        "It is accepted only if the independently detected tick positions support the same mapping."
+                    )
+                elif round(candidate_value, 12) in minus_alternatives:
+                    candidate_note = (
+                        "A minus glyph was present in the isolated source-label region but may have been lost by OCR. "
+                        "This negative reading is an alternative only and requires corroboration from other tick anchors."
+                    )
                 output.append(TickLabel(
-                    axis, float(pixel), label_for_review, float(candidate_value), float(candidate_confidence),
+                    axis, float(candidate_pixel), label_for_review, float(candidate_value), float(candidate_confidence),
                     candidate_status, candidate_label, candidate_note,
                 ))
         return tuple(output)
 
     x_ticks = labels_for_axis("x", x_pixels, x_spacing, x_tolerance, x_band, x_side, horizontal, vertical)
     y_ticks = labels_for_axis("y", y_pixels, y_spacing, y_tolerance, y_band, y_side, vertical, horizontal)
+    origin_zeros = _origin_zero_candidates(words, horizontal, vertical, crop)
+    for origin_zero in origin_zeros:
+        target = x_ticks if origin_zero.axis == "x" else y_ticks
+        if not any(
+            tick.axis == origin_zero.axis and abs(tick.pixel - origin_zero.pixel) <= 2 and tick.value == 0
+            for tick in target
+        ):
+            if origin_zero.axis == "x":
+                x_ticks = (*x_ticks, origin_zero)
+            else:
+                y_ticks = (*y_ticks, origin_zero)
     all_reviews.extend(x_ticks)
     all_reviews.extend(y_ticks)
     return x_ticks, y_ticks, tuple(all_reviews), corrected_pi_alias
@@ -1688,7 +1888,13 @@ def _fit_axis(ticks: Sequence[TickLabel], axis: Literal["x", "y"]) -> _AxisFit |
         pixel = np.asarray([tick.pixel for tick in usable], dtype=float)
         values = np.asarray([tick.value for tick in usable], dtype=float)
         transformed = np.log10(values) if scale == "log" else values
-        threshold = max(4.0, float(np.ptp(pixel)) * 0.018)
+        distinct_pixels = np.unique(np.round(pixel, 2))
+        local_spacing = float(np.median(np.diff(distinct_pixels))) if len(distinct_pixels) >= 2 else float(np.ptp(pixel))
+        # OCR label centers are not always printed directly over tick marks;
+        # on small plots, font alignment can shift a label by several pixels.
+        # Use a modest fraction of the observed interval (still capped by the
+        # axis span) and let multi-anchor consensus reject value outliers.
+        threshold = max(5.0, min(float(np.ptp(pixel)) * 0.018, local_spacing * 0.08))
         best: tuple[int, float, float, float, float] | None = None
         for first in range(len(usable) - 1):
             for second in range(first + 1, len(usable)):
@@ -1751,7 +1957,11 @@ def _fit_axis(ticks: Sequence[TickLabel], axis: Literal["x", "y"]) -> _AxisFit |
 
     linear_fit = robust_fit("linear")
     positive_tick_count = len({round(tick.pixel, 2) for tick in points if float(tick.value) > 0})
-    logarithmic_fit = robust_fit("log") if positive_tick_count >= 3 else None
+    # A logarithmic axis cannot represent any confirmed zero/negative tick.
+    # Do not let a positive subset of a mixed-sign axis win merely because a
+    # few OCR alternatives happen to line up in log space.
+    all_ticks_positive = all(float(tick.value) > 0 for tick in points)
+    logarithmic_fit = robust_fit("log") if positive_tick_count >= 3 and all_ticks_positive else None
     selected_scale: ImageScale = "linear"
     selected = linear_fit
     # A two-point logarithmic fit has zero residual by construction and can
@@ -1772,10 +1982,25 @@ def _fit_axis(ticks: Sequence[TickLabel], axis: Literal["x", "y"]) -> _AxisFit |
     if len(accepted) < 2:
         return None
     first, last = accepted[0], accepted[-1]
+    transformed = np.asarray([
+        math.log10(float(tick.value)) if selected_scale == "log" else float(tick.value)
+        for tick in accepted
+    ])
+    pixels = np.asarray([tick.pixel for tick in accepted], dtype=float)
+    slope, intercept = np.linalg.lstsq(
+        np.column_stack((transformed, np.ones(len(transformed)))), pixels, rcond=None
+    )[0]
+    first_coordinate = math.log10(float(first.value)) if selected_scale == "log" else float(first.value)
+    last_coordinate = math.log10(float(last.value)) if selected_scale == "log" else float(last.value)
+    # Preserve the multi-anchor regression in the two-point calibration type:
+    # raw outer label centers can be misaligned by a few pixels, and using them
+    # directly would discard the noise reduction from the accepted tick set.
+    first_pixel = float(slope * first_coordinate + intercept)
+    last_pixel = float(slope * last_coordinate + intercept)
     return _AxisFit(
-        first_pixel=first.pixel,
+        first_pixel=first_pixel,
         first_value=first.value,
-        last_pixel=last.pixel,
+        last_pixel=last_pixel,
         last_value=last.value,
         scale=selected_scale,
         ticks=accepted,
@@ -1993,6 +2218,13 @@ def auto_calibrate_axes(
         warnings.append("X has only two usable ticks, so linear versus logarithmic scale cannot be inferred from spacing. Linear is selected provisionally; review the axis scale.")
     if y_fit and len(y_fit.ticks) == 2:
         warnings.append("Y has only two usable ticks, so linear versus logarithmic scale cannot be inferred from spacing. Linear is selected provisionally; review the axis scale.")
+    contextual_zero_used = any(
+        tick.note and "proposed as zero" in tick.note and tick.review_status == "ACCEPTED"
+        for tick in final_review_ticks
+    )
+    if contextual_zero_used:
+        confidence = "MEDIUM"
+        warnings.append("An O/omicron glyph at the axis intersection supported the zero tick only in context; confirm this label against the source image.")
     if x_rejected or y_rejected:
         warnings.append("One or more tick readings did not agree with the fitted axis mapping and were excluded. Review the tick overlay.")
     return AutomaticCalibrationResult(
